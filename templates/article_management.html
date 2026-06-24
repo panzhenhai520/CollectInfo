@@ -690,8 +690,67 @@
             background:#f5f3ff;border-color:#ddd6fe;color:#6d28d9;
         }
         .compact-action-btn.ai-action:hover { background:#ede9fe;border-color:#c4b5fd; }
+
+        /* 联网搜索按钮 */
+        .chat-search-toggle {
+            padding:5px 10px;border-radius:7px;border:1px solid #d1d5db;
+            font-size:12px;cursor:pointer;background:#fff;color:#374151;
+            display:inline-flex;align-items:center;gap:5px;white-space:nowrap;
+            transition:all .15s;flex-shrink:0;height:38px;
+        }
+        .chat-search-toggle.on {
+            background:#ecfdf5;border-color:#6ee7b7;color:#047857;font-weight:600;
+        }
+        .chat-search-toggle:hover { background:#f0fdf4;border-color:#86efac; }
+        /* 搜索状态指示 */
+        .chat-searching-bar {
+            display:none;padding:5px 14px;background:#fef9c3;border-bottom:1px solid #fde68a;
+            font-size:11px;color:#92400e;align-items:center;gap:6px;flex-shrink:0;
+        }
+        .chat-searching-bar.visible { display:flex; }
+        /* 搜索引用来源 */
+        .chat-sources {
+            margin-top:6px;padding:6px 8px;background:#f0f9ff;border:1px solid #bae6fd;
+            border-radius:6px;font-size:11px;color:#0369a1;
+        }
+        .chat-sources a { color:#0369a1;text-decoration:underline;word-break:break-all; }
+        /* Markdown 渲染样式 */
+        .chat-bubble-ai h1,.chat-bubble-ai h2,.chat-bubble-ai h3 {
+            font-weight:700;margin:.5em 0 .3em;line-height:1.3;
+        }
+        .chat-bubble-ai h1{font-size:1.15em;}
+        .chat-bubble-ai h2{font-size:1.08em;}
+        .chat-bubble-ai h3{font-size:1.0em;}
+        .chat-bubble-ai p { margin:.35em 0; }
+        .chat-bubble-ai ul,.chat-bubble-ai ol { padding-left:1.4em;margin:.35em 0; }
+        .chat-bubble-ai li { margin:.2em 0; }
+        .chat-bubble-ai code {
+            background:#f1f5f9;padding:1px 5px;border-radius:4px;
+            font-family:monospace;font-size:12px;color:#0f172a;
+        }
+        .chat-bubble-ai pre {
+            background:#1e293b;color:#e2e8f0;padding:10px 12px;
+            border-radius:7px;overflow-x:auto;margin:.5em 0;font-size:12px;
+        }
+        .chat-bubble-ai pre code { background:none;color:inherit;padding:0; }
+        .chat-bubble-ai strong { font-weight:700; }
+        .chat-bubble-ai em { font-style:italic; }
+        .chat-bubble-ai a { color:#2563eb;text-decoration:underline; }
+        .chat-bubble-ai blockquote {
+            border-left:3px solid #cbd5e1;padding-left:10px;color:#64748b;margin:.4em 0;
+        }
+        .chat-bubble-ai table {
+            border-collapse:collapse;width:100%;margin:.4em 0;font-size:12px;
+        }
+        .chat-bubble-ai th,.chat-bubble-ai td {
+            border:1px solid #e2e8f0;padding:4px 8px;
+        }
+        .chat-bubble-ai th { background:#f8fafc;font-weight:600; }
+        /* 流式时不渲染 markdown，完成后再渲染 */
+        .chat-bubble-ai.streaming { white-space:pre-wrap; }
     </style>
     <script src="/static/js/opencc.min.js"></script>
+    <script src="/static/js/marked.min.js"></script>
 </head>
 <body class="bg-gray-50">
     <!-- 顶部导航栏 -->
@@ -815,8 +874,8 @@
                         </h2>
                         <p class="text-xs text-gray-500 mt-1">点击关键词节点查看对应采集文章</p>
                     </div>
-                    <button id="clearKeywordBtn" onclick="clearKeywordSelection()" class="compact-action-btn success-action hidden" title="清除关键词筛选">
-                        <i class="fa fa-times"></i><span>显示图谱</span>
+                    <button onclick="openChatDrawer(selectedKeyword || '')" class="compact-action-btn ai-action" title="打开在线助手，当前话题：所选关键词">
+                        <i class="fa fa-robot"></i><span>在线助手</span>
                     </button>
                 </div>
                 <div id="keywordMapContainer" class="keyword-map-grid">
@@ -848,9 +907,6 @@
                         <option value="">所有域名</option>
                     </select>
                     <div class="article-actions">
-                        <button onclick="openChatDrawer('')" class="compact-action-btn ai-action" title="打开在线助手">
-                            <i class="fa fa-robot"></i><span>在线助手</span>
-                        </button>
                         <button onclick="refreshArticles()" class="compact-action-btn primary-action" title="刷新文章列表">
                             <i class="fa fa-sync"></i><span>刷新</span>
                         </button>
@@ -1203,8 +1259,6 @@
             displayKeywordMap(keywordMapData);
             updateKeywordSelection();
             loadArticles(1);
-            // 点击关键词时同步打开在线助手，以该关键词作为话题
-            if (selectedKeyword) openChatDrawer(selectedKeyword);
         }
 
         function clearKeywordSelection() {
@@ -1218,17 +1272,14 @@
 
         function updateKeywordSelection(total) {
             const summary = document.getElementById('selectedKeywordSummary');
-            const clearBtn = document.getElementById('clearKeywordBtn');
-            if (!summary || !clearBtn) return;
+            if (!summary) return;
 
             if (!selectedKeyword) {
                 summary.classList.remove('active');
                 summary.innerHTML = '';
-                clearBtn.classList.add('hidden');
                 return;
             }
 
-            clearBtn.classList.remove('hidden');
             const shownTotal = typeof total === 'number' ? total : selectedKeywordCount;
             summary.classList.add('active');
             summary.innerHTML = `<div class="min-w-0">
@@ -2021,11 +2072,20 @@
             <button onclick="clearChatTopic()" style="margin-left:6px;font-size:10px;color:#6b7280;background:none;border:none;cursor:pointer;">× 取消</button>
         </div>
 
+        <!-- 搜索状态指示条 -->
+        <div id="chatSearchingBar" class="chat-searching-bar">
+            <i class="fa fa-spinner fa-spin"></i>
+            <span id="chatSearchingMsg">正在联网搜索…</span>
+        </div>
+
         <!-- 消息列表 -->
         <div id="chatMessages" class="chat-messages"></div>
 
         <!-- 输入区 -->
         <div class="chat-input-area">
+            <button id="chatWebSearchBtn" class="chat-search-toggle" onclick="toggleWebSearch()" title="开启后每次发送前先联网搜索，将实时数据注入上下文">
+                <i class="fa fa-globe"></i><span id="wsLabel">联网</span>
+            </button>
             <textarea id="chatInput" class="chat-input" rows="2" placeholder="输入您的问题，Enter 发送，Shift+Enter 换行…" onkeydown="handleChatKeyDown(event)" oninput="autoResizeInput(this)"></textarea>
             <button id="chatSendBtn" class="chat-send-btn" onclick="sendChatMessage()">
                 <i class="fa fa-paper-plane"></i>
@@ -2042,6 +2102,7 @@
         topic: '',
         messages: [],       // [{role, content}]
         isStreaming: false,
+        webSearch: false,   // 联网搜索开关
         chatConfig: {},     // 从后端加载的配置
     };
 
@@ -2049,6 +2110,36 @@
         doubao: '豆包', deepseek: 'DeepSeek', gemini: 'Gemini',
         chatgpt: 'ChatGPT', claude: 'Claude',
     };
+
+    // ── Markdown 渲染 ──
+    function renderMarkdown(text) {
+        if (typeof marked === 'undefined') return escapeHtmlChat(text);
+        try {
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                // 禁止原始 HTML 注入防 XSS
+                sanitize: false,
+            });
+            return marked.parse(text);
+        } catch(e) {
+            return escapeHtmlChat(text);
+        }
+    }
+
+    // ── 联网搜索开关 ──
+    function toggleWebSearch() {
+        chatState.webSearch = !chatState.webSearch;
+        const btn = document.getElementById('chatWebSearchBtn');
+        const lbl = document.getElementById('wsLabel');
+        if (chatState.webSearch) {
+            btn.classList.add('on');
+            lbl.textContent = '联网 ✓';
+        } else {
+            btn.classList.remove('on');
+            lbl.textContent = '联网';
+        }
+    }
 
     // ── 初始化 ──
     async function initChatConfig() {
@@ -2280,7 +2371,6 @@
         input.value = '';
         autoResizeInput(input);
 
-        // 追加到 messages 历史
         chatState.messages.push({role:'user', content: text});
         appendUserMessage(text);
 
@@ -2289,10 +2379,11 @@
         sendBtn.disabled = true;
         sendBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
 
-        // 创建 AI 消息气泡
+        const searchingBar = document.getElementById('chatSearchingBar');
         const aiDiv = appendAiMessage('', true, false);
         const bubble = aiDiv.querySelector('.chat-bubble-ai');
         let fullResponse = '';
+        let searchSources = [];
 
         try {
             const resp = await fetch('/api/chat/send', {
@@ -2302,6 +2393,7 @@
                     model: chatState.activeModel,
                     topic: chatState.topic,
                     messages: chatState.messages,
+                    web_search: chatState.webSearch,
                 }),
             });
 
@@ -2320,14 +2412,36 @@
                     const data_str = line.slice(5).trim();
                     try {
                         const ev = JSON.parse(data_str);
-                        if (ev.type === 'chunk') {
+                        if (ev.type === 'searching') {
+                            // 显示搜索中指示条
+                            document.getElementById('chatSearchingMsg').textContent = ev.message;
+                            searchingBar.classList.add('visible');
+                        } else if (ev.type === 'search_done') {
+                            searchingBar.classList.remove('visible');
+                            searchSources = ev.snippets || [];
+                        } else if (ev.type === 'chunk') {
                             fullResponse += ev.content;
+                            // 流式阶段：纯文本展示（带光标）
                             bubble.classList.add('streaming');
-                            bubble.innerHTML = escapeHtmlChat(fullResponse);
+                            bubble.textContent = fullResponse;
                             scrollChatBottom();
                         } else if (ev.type === 'done') {
                             bubble.classList.remove('streaming');
+                            // 流式完成后渲染 Markdown
+                            bubble.innerHTML = renderMarkdown(fullResponse);
+                            // 若有搜索来源，追加引用卡片
+                            if (searchSources.length) {
+                                const srcDiv = document.createElement('div');
+                                srcDiv.className = 'chat-sources';
+                                srcDiv.innerHTML = '<i class="fa fa-globe mr-1"></i><strong>参考来源：</strong><br>' +
+                                    searchSources.map((s,i) =>
+                                        `<a href="${escapeHtmlChat(s.href)}" target="_blank" rel="noopener">[${i+1}] ${escapeHtmlChat(s.title || s.href)}</a>`
+                                    ).join('<br>');
+                                aiDiv.appendChild(srcDiv);
+                            }
+                            scrollChatBottom();
                         } else if (ev.type === 'error') {
+                            searchingBar.classList.remove('visible');
                             bubble.classList.remove('streaming');
                             bubble.innerHTML = `<span style="color:#dc2626;"><i class="fa fa-exclamation-triangle mr-1"></i>${escapeHtmlChat(ev.message)}</span>`;
                             fullResponse = '';
@@ -2336,7 +2450,12 @@
                 }
             }
             bubble.classList.remove('streaming');
+            // 如果流结束但没收到 done 事件，也渲染 markdown
+            if (fullResponse && !bubble.querySelector('p,h1,h2,h3,ul,ol,pre')) {
+                bubble.innerHTML = renderMarkdown(fullResponse);
+            }
         } catch(e) {
+            searchingBar.classList.remove('visible');
             bubble.classList.remove('streaming');
             bubble.innerHTML = `<span style="color:#dc2626;"><i class="fa fa-exclamation-triangle mr-1"></i>请求失败: ${escapeHtmlChat(e.message)}</span>`;
             fullResponse = '';

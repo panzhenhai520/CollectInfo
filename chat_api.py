@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""在线助手 Chat API - 支持豆包/DeepSeek/Gemini/ChatGPT/Claude 流式对话"""
+"""在线助手 Chat API - 支持豆包/DeepSeek/Gemini/ChatGPT/Claude 流式对话 + 联网搜索"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import json
 import os
 import time
 import uuid
-from typing import Generator
+from typing import Generator, List, Dict
 
 import requests
 from flask import Blueprint, Response, jsonify, request, stream_with_context
@@ -81,6 +81,32 @@ def _save_config(cfg: dict) -> None:
     os.makedirs(_CONFIG_DIR, exist_ok=True)
     with open(_CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+
+def _web_search(query: str, max_results: int = 5) -> List[Dict]:
+    """联网搜索，使用 DuckDuckGo，返回 [{title, body, href}, ...]"""
+    try:
+        from duckduckgo_search import DDGS
+        with DDGS(timeout=12) as ddgs:
+            results = list(ddgs.text(query, max_results=max_results))
+        return results or []
+    except Exception as e:
+        print(f'[chat] web search error: {e}')
+        return []
+
+
+def _format_search_context(results: List[Dict], query: str) -> str:
+    """将搜索结果格式化为注入系统提示的文本"""
+    if not results:
+        return ''
+    lines = [f'以下是关于「{query}」的最新联网搜索结果（请基于这些信息回答）：\n']
+    for i, r in enumerate(results, 1):
+        title = r.get('title', '').strip()
+        body = r.get('body', '').strip()[:300]
+        href = r.get('href', '')
+        lines.append(f'[{i}] {title}\n{body}\n来源: {href}\n')
+    lines.append('\n请综合以上实时搜索结果回答用户问题，并在适当位置注明信息来源。')
+    return '\n'.join(lines)
 
 
 def _generate_system_prompt(topic: str) -> str:
@@ -274,6 +300,7 @@ def send_chat_message():
     model_id = data.get('model', '')
     topic = data.get('topic', '')
     history = data.get('messages', [])  # [{role, content}, ...]
+    web_search = bool(data.get('web_search', False))
 
     if model_id not in MODEL_META:
         return jsonify({'success': False, 'message': f'未知模型: {model_id}'}), 400
@@ -288,16 +315,46 @@ def send_chat_message():
             yield f'data: {json.dumps({"type":"error","message":MODEL_META[model_id]["name"]+" API Key 未配置，请在设置中填写"})}\n\n'
         return Response(stream_with_context(_err()), mimetype='text/event-stream')
 
-    system_prompt = _generate_system_prompt(topic)
+    # 取最后一条用户消息作为搜索 query
+    last_user_msg = ''
+    for m in reversed(history):
+        if m.get('role') == 'user':
+            last_user_msg = m.get('content', '')
+            break
+
     meta = MODEL_META[model_id]
 
-    # OpenAI 兼容接口需要把 system 放进 messages
-    if meta['type'] == 'openai':
-        full_messages = [{'role': 'system', 'content': system_prompt}] + history
-    else:
-        full_messages = history
-
     def _generate():
+        search_context = ''
+        search_snippets = []
+
+        # 联网搜索阶段
+        if web_search and last_user_msg:
+            yield f'data: {json.dumps({"type":"searching","message":f"正在搜索「{last_user_msg[:40]}」…"})}\n\n'
+            try:
+                results = _web_search(last_user_msg, max_results=5)
+                if results:
+                    search_context = _format_search_context(results, last_user_msg)
+                    search_snippets = [
+                        {'title': r.get('title', ''), 'href': r.get('href', '')}
+                        for r in results[:5]
+                    ]
+                    yield f'data: {json.dumps({"type":"search_done","count":len(results),"snippets":search_snippets})}\n\n'
+                else:
+                    yield f'data: {json.dumps({"type":"search_done","count":0,"snippets":[]})}\n\n'
+            except Exception as se:
+                yield f'data: {json.dumps({"type":"search_done","count":0,"snippets":[],"warn":str(se)[:80]})}\n\n'
+
+        # 构建最终系统提示（基础 + 搜索结果）
+        base_prompt = _generate_system_prompt(topic)
+        system_prompt = (base_prompt + '\n\n' + search_context) if search_context else base_prompt
+
+        # 组装 messages
+        if meta['type'] == 'openai':
+            full_messages = [{'role': 'system', 'content': system_prompt}] + history
+        else:
+            full_messages = history
+
         try:
             if meta['type'] == 'openai':
                 for chunk in _stream_openai(api_key, meta['base_url'], model_name, full_messages):

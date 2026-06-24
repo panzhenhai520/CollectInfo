@@ -57,3 +57,6 @@ browserforge>=1.1.0         # 生成更真实的浏览器请求头/指纹
 # 大规模定时任务稳定性
 tenacity>=8.2.3             # 统一重试、指数退避和随机抖动
 requests-cache>=1.1.1       # 缓存robots/sitemap/feed等低风险发现请求
+
+# 在线助手联网搜索
+duckduckgo_search>=6.0.0
