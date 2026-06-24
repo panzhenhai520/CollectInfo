@@ -539,6 +539,145 @@ def config_management():
 def batch_schedule():
     return render_template('batch_schedule.html')
 
+@app.route('/thread-monitor')
+@login_required
+def thread_monitor():
+    return render_template('thread_monitor.html')
+
+@app.route('/api/thread-monitor/status')
+@login_required
+def thread_monitor_status():
+    import re as _re
+    from datetime import datetime as _dt
+    now = get_china_time()
+    today_str = now.strftime('%Y-%m-%d')
+    now_minutes = now.hour * 60 + now.minute + now.second / 60.0
+
+    def parse_minutes(s):
+        if not s: return None
+        try:
+            clean = str(s).replace('Z', '').strip()
+            if 'T' not in clean and ' ' in clean:
+                clean = clean.replace(' ', 'T')
+            d = _dt.fromisoformat(clean)
+            return d.hour * 60 + d.minute + d.second / 60.0
+        except:
+            return None
+
+    # 1. 获取活跃定时任务的显示名称
+    sch_tasks, _ = sqlite_db.get_scheduled_tasks(page=1, per_page=1000, is_active=True)
+    sch_map = {s['id']: s for s in sch_tasks}
+
+    # 2. 运行中的任务
+    running_raw = scheduler.get_running_tasks()
+    running_tasks = []
+    for t in running_raw:
+        sid = t.get('schedule_id')
+        sch = sch_map.get(sid, {})
+        display = sch.get('url_display_name') or sch.get('task_name') or t.get('task_name', '未知')
+        sm = parse_minutes(t.get('started_at')) or now_minutes
+        running_tasks.append({
+            'schedule_id': sid,
+            'display_name': display,
+            'domain': t.get('domain', ''),
+            'started_at': str(t.get('started_at', '')),
+            'started_minutes': round(sm, 2),
+            'now_minutes': round(now_minutes, 2),
+            'duration_minutes': round(now_minutes - sm, 1),
+            'stop_flag': t.get('stop_flag', False),
+            'type': 'running',
+            'status': 'running'
+        })
+
+    # 3. 今日已完成任务
+    completed_today = []
+    try:
+        with sqlite_db.lock:
+            cur = sqlite_db.connection.cursor()
+            cur.execute("""
+                SELECT ct.task_name, ct.target_url, ct.started_at, ct.completed_at,
+                       ct.status, ct.schedule_id, ct.articles_found
+                FROM crawl_tasks ct
+                WHERE (DATE(ct.started_at)=? OR DATE(ct.completed_at)=?)
+                  AND ct.status IN ('completed','failed','timeout','stopped')
+                ORDER BY ct.started_at LIMIT 300
+            """, (today_str, today_str))
+            rows = [dict(r) for r in cur.fetchall()]
+        for c in rows:
+            sm = parse_minutes(c.get('started_at'))
+            cm = parse_minutes(c.get('completed_at')) or now_minutes
+            if sm is None: continue
+            sid = c.get('schedule_id')
+            sch = sch_map.get(sid, {})
+            display = sch.get('url_display_name') or sch.get('task_name') or c.get('task_name', '')
+            completed_today.append({
+                'display_name': display,
+                'task_name': c.get('task_name', ''),
+                'started_minutes': round(max(0, sm), 2),
+                'completed_minutes': round(min(1440, cm), 2),
+                'duration_minutes': round(cm - sm, 1),
+                'status': c.get('status', 'completed'),
+                'articles_found': c.get('articles_found') or 0,
+                'type': 'completed'
+            })
+    except Exception as e:
+        print(f'thread-monitor completed query error: {e}')
+
+    # 4. 待执行任务（today future）
+    pending_tasks = []
+    for st in sch_tasks:
+        nr = st.get('next_run')
+        if not nr: continue
+        try:
+            clean = str(nr).replace('Z', '').strip()
+            if 'T' not in clean and ' ' in clean:
+                clean = clean.replace(' ', 'T')
+            ndt = _dt.fromisoformat(clean)
+            if ndt.strftime('%Y-%m-%d') == today_str and ndt > now:
+                nm = ndt.hour * 60 + ndt.minute
+                pending_tasks.append({
+                    'schedule_id': st['id'],
+                    'display_name': st.get('url_display_name') or st.get('task_name', ''),
+                    'next_run_display': ndt.strftime('%H:%M'),
+                    'next_minutes': nm
+                })
+        except:
+            continue
+    pending_tasks.sort(key=lambda x: x['next_minutes'])
+
+    stats = scheduler.get_concurrent_stats()
+    return jsonify({
+        'success': True,
+        'current_time': now.isoformat(),
+        'current_time_display': now.strftime('%H:%M:%S'),
+        'now_minutes': round(now_minutes, 2),
+        'max_concurrent': scheduler.max_concurrent_tasks,
+        'running_tasks': running_tasks,
+        'completed_today': completed_today,
+        'pending_tasks': pending_tasks,
+        'stats': stats
+    })
+
+@app.route('/api/thread-monitor/set-concurrent', methods=['POST'])
+@login_required
+def set_max_concurrent():
+    import re as _re
+    data = request.get_json(silent=True) or {}
+    n = max(1, min(32, int(data.get('max_concurrent', 4))))
+    scheduler.max_concurrent_tasks = n
+    # 持久化到 .env
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    try:
+        with open(env_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        content = _re.sub(r'CRAWL_SCHEDULER_MAX_CONCURRENT=\d+',
+                          f'CRAWL_SCHEDULER_MAX_CONCURRENT={n}', content)
+        with open(env_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+    except Exception as e:
+        print(f'Warning: could not update .env: {e}')
+    return jsonify({'success': True, 'max_concurrent': n, 'message': f'并发数已更新为 {n}'})
+
 # API路由：保存API密钥
 @app.route('/api/save-api-key', methods=['POST'])
 def save_api_key():

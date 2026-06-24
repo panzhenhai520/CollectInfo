@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>线程监控 - RAG内容聚合平台</title>
+    <link href="/static/css/tailwind.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/fontawesome.css">
+    <style>
+        .gradient-bg { background: linear-gradient(135deg,#2563eb 0%,#7c3aed 100%); }
+        .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:20px; }
+        .badge-running  { background:#dbeafe; color:#1d4ed8; }
+        .badge-completed{ background:#d1fae5; color:#065f46; }
+        .badge-failed   { background:#fee2e2; color:#991b1b; }
+        .badge-pending  { background:#fef3c7; color:#92400e; }
+        .badge { display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600; }
+        #tooltip {
+            position:fixed; z-index:9999; pointer-events:none;
+            background:rgba(17,24,39,.92); color:#f9fafb;
+            padding:8px 12px; border-radius:8px; font-size:12px;
+            line-height:1.6; max-width:220px; display:none;
+            box-shadow:0 4px 16px rgba(0,0,0,.3);
+        }
+        .concurrency-input { width:64px; border:1px solid #d1d5db; border-radius:6px; padding:4px 8px; font-size:14px; text-align:center; }
+        .btn-save { background:#2563eb; color:#fff; border:none; border-radius:6px; padding:6px 14px; font-size:13px; cursor:pointer; }
+        .btn-save:hover { background:#1d4ed8; }
+        .btn-refresh { background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:6px 12px; font-size:13px; cursor:pointer; }
+        .btn-refresh:hover { background:#e5e7eb; }
+        .stat-card { background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:12px 16px; text-align:center; }
+        .stat-val { font-size:24px; font-weight:700; color:#1e293b; }
+        .stat-lbl { font-size:12px; color:#64748b; margin-top:2px; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- 导航 -->
+<nav class="bg-white shadow-md">
+    <div class="container mx-auto px-4">
+        <div class="flex justify-between items-center py-4">
+            <div class="flex items-center">
+                <div class="gradient-bg p-2 rounded-lg mr-3">
+                    <i class="fa fa-book text-white text-xl"></i>
+                </div>
+                <h1 class="text-xl font-bold text-gray-800">RAG内容聚合平台</h1>
+            </div>
+            <div class="hidden md:flex space-x-6 items-center">
+                <a href="/" class="text-gray-600 hover:text-blue-600 transition-colors">控制台</a>
+                <a href="/schedule-management" class="text-gray-600 hover:text-blue-600 transition-colors">任务调度</a>
+                <a href="/article-management" class="text-gray-600 hover:text-blue-600 transition-colors">聚合结果</a>
+                <details class="relative">
+                    <summary class="list-none cursor-pointer text-gray-600 hover:text-blue-600 transition-colors">系统管理 <i class="fa fa-chevron-down text-xs ml-1"></i></summary>
+                    <div class="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1">
+                        <a href="/url-management" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">URL与分类管理</a>
+                        <a href="/batch-schedule" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">批量任务</a>
+                        <a href="/thread-monitor" class="block px-4 py-2 text-sm text-blue-700 bg-blue-50 font-medium">线程监控</a>
+                        <a href="/schedule-execution-management" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">执行日志</a>
+                        <a href="/config-management" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">配置管理</a>
+                    </div>
+                </details>
+                <a href="/logout" class="text-gray-600 hover:text-red-600 transition-colors"><i class="fa fa-sign-out-alt mr-1"></i>退出登录</a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<div id="tooltip"></div>
+
+<main class="container mx-auto px-4 py-6 max-w-7xl">
+
+    <!-- 标题栏 -->
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800">线程监控</h2>
+            <p class="text-gray-500 text-sm mt-1">实时显示爬取线程状态与全天任务甘特图</p>
+        </div>
+        <div class="flex items-center gap-3 flex-wrap">
+            <!-- 并发数设置 -->
+            <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:6px 12px;">
+                <i class="fa fa-sliders-h text-blue-500 text-sm"></i>
+                <span style="font-size:13px;color:#374151;font-weight:500;">并发线程数</span>
+                <input id="concInput" type="number" min="1" max="32" class="concurrency-input" value="4">
+                <button class="btn-save" onclick="saveConcurrent()">保存</button>
+            </div>
+            <!-- 刷新 -->
+            <button class="btn-refresh" onclick="fetchAndRender()">
+                <i class="fa fa-sync-alt mr-1"></i>刷新
+            </button>
+            <span id="clockDisplay" style="font-size:13px;color:#6b7280;font-family:monospace;"></span>
+            <span id="nextRefresh" style="font-size:12px;color:#9ca3af;"></span>
+        </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div id="statsRow" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+        <div class="stat-card"><div class="stat-val" id="sRunning">-</div><div class="stat-lbl">运行中</div></div>
+        <div class="stat-card"><div class="stat-val" id="sSlots">-</div><div class="stat-lbl">空闲槽位</div></div>
+        <div class="stat-card"><div class="stat-val" id="sCompleted">-</div><div class="stat-lbl">今日完成</div></div>
+        <div class="stat-card"><div class="stat-val" id="sPending">-</div><div class="stat-lbl">待触发</div></div>
+    </div>
+
+    <!-- 图例 -->
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
+        <span style="font-size:13px;color:#374151;font-weight:500;">图例：</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#374151;"><span style="width:16px;height:12px;background:#3b82f6;border-radius:3px;display:inline-block;"></span>运行中</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#374151;"><span style="width:16px;height:12px;background:#10b981;border-radius:3px;display:inline-block;"></span>已完成</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#374151;"><span style="width:16px;height:12px;background:#ef4444;border-radius:3px;display:inline-block;"></span>失败/超时</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#374151;"><span style="width:16px;height:12px;background:#f59e0b;border-radius:3px;display:inline-block;"></span>待触发</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#ef4444;"><span style="width:2px;height:16px;background:#ef4444;display:inline-block;border-radius:1px;"></span>当前时刻</span>
+    </div>
+
+    <!-- 甘特图 -->
+    <div class="card" style="padding:16px;overflow-x:auto;">
+        <div id="chartWrap" style="min-width:800px;position:relative;">
+            <svg id="ganttSvg" style="width:100%;display:block;"></svg>
+        </div>
+        <div id="chartEmpty" style="text-align:center;padding:40px;color:#9ca3af;display:none;">
+            <i class="fa fa-chart-bar text-2xl mb-2"></i><br>暂无任务数据
+        </div>
+    </div>
+
+    <!-- 运行中任务明细 -->
+    <div class="card mt-4" id="runningSection">
+        <h3 style="font-size:15px;font-weight:600;color:#374151;margin-bottom:12px;">
+            <i class="fa fa-spinner fa-spin text-blue-500 mr-2"></i>运行中的任务
+        </h3>
+        <div id="runningList" style="font-size:13px;color:#6b7280;">加载中…</div>
+    </div>
+
+    <!-- 待触发任务 -->
+    <div class="card mt-4" id="pendingSection">
+        <h3 style="font-size:15px;font-weight:600;color:#374151;margin-bottom:12px;">
+            <i class="fa fa-clock text-yellow-500 mr-2"></i>今日待触发任务
+        </h3>
+        <div id="pendingList" style="font-size:13px;color:#6b7280;">加载中…</div>
+    </div>
+
+</main>
+
+<script>
+// ── 状态 ──
+let lastData = null;
+let refreshTimer = null;
+let countdown = 30;
+const ML = 90, MR = 20, MT = 38, LANE_H = 46, BAR_H = 28, PENDING_ZONE = 64;
+
+// ── 工具 ──
+function hhmm(minutes) {
+    const h = Math.floor(minutes / 60) % 24;
+    const m = Math.floor(minutes % 60);
+    return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+}
+function fmtDur(min) {
+    if (min < 1) return '<1分钟';
+    if (min < 60) return Math.round(min) + '分钟';
+    return Math.floor(min/60) + 'h' + Math.round(min%60) + 'm';
+}
+function xmlEsc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── 时钟 ──
+function updateClock() {
+    const now = new Date();
+    document.getElementById('clockDisplay').textContent =
+        now.toLocaleTimeString('zh-CN',{hour12:false});
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── 倒计时 ──
+function tickRefresh() {
+    countdown--;
+    document.getElementById('nextRefresh').textContent = `${countdown}s 后自动刷新`;
+    if (countdown <= 0) { countdown = 30; fetchAndRender(); }
+}
+setInterval(tickRefresh, 1000);
+
+// ── 获取数据 ──
+async function fetchAndRender() {
+    countdown = 30;
+    try {
+        const res = await fetch('/api/thread-monitor/status');
+        const data = await res.json();
+        if (!data.success) return;
+        lastData = data;
+        document.getElementById('concInput').value = data.max_concurrent;
+        updateStats(data);
+        renderChart(data);
+        renderRunning(data);
+        renderPending(data);
+    } catch(e) {
+        console.error('fetch error', e);
+    }
+}
+
+// ── 统计卡片 ──
+function updateStats(d) {
+    document.getElementById('sRunning').textContent   = d.running_tasks.length;
+    document.getElementById('sSlots').textContent     = Math.max(0, d.max_concurrent - d.running_tasks.length);
+    document.getElementById('sCompleted').textContent = d.completed_today.length;
+    document.getElementById('sPending').textContent   = d.pending_tasks.length;
+}
+
+// ── 甘特图渲染 ──
+function renderChart(data) {
+    const svg = document.getElementById('ganttSvg');
+    const wrap = document.getElementById('chartWrap');
+    const W = wrap.clientWidth || 900;
+    const lanes = data.max_concurrent;
+    const chartW = W - ML - MR;
+    const chartH = MT + lanes * LANE_H + PENDING_ZONE + 10;
+
+    svg.setAttribute('width', W);
+    svg.setAttribute('height', chartH);
+    svg.setAttribute('viewBox', `0 0 ${W} ${chartH}`);
+
+    // 把所有任务合并并按开始时间排序
+    const allTasks = [
+        ...data.completed_today.map(t => ({...t})),
+        ...data.running_tasks.map(t => ({
+            ...t,
+            completed_minutes: t.now_minutes,
+        }))
+    ].sort((a,b) => a.started_minutes - b.started_minutes);
+
+    // 贪心分配车道
+    const laneEnds = new Array(lanes).fill(0);
+    const assignedLane = allTasks.map(task => {
+        let best = 0, minEnd = Infinity;
+        for (let i = 0; i < lanes; i++) {
+            if (laneEnds[i] <= task.started_minutes + 1 && laneEnds[i] < minEnd) {
+                minEnd = laneEnds[i]; best = i;
+            }
+        }
+        // 若全满，分配给结束时间最早的车道
+        if (minEnd === Infinity) {
+            best = laneEnds.indexOf(Math.min(...laneEnds));
+        }
+        laneEnds[best] = task.completed_minutes || task.now_minutes;
+        return best;
+    });
+
+    const xOf = m => ML + (Math.max(0, Math.min(1440, m)) / 1440) * chartW;
+    const nowX = xOf(data.now_minutes);
+
+    let s = '';
+    // 背景
+    s += `<rect width="${W}" height="${chartH}" fill="#fff"/>`;
+
+    // 车道背景 + 标签
+    for (let i = 0; i < lanes; i++) {
+        const y = MT + i * LANE_H;
+        s += `<rect x="${ML}" y="${y}" width="${chartW}" height="${LANE_H}" fill="${i%2===0?'#fafafa':'#fff'}"/>`;
+        s += `<text x="${ML-8}" y="${y+LANE_H/2+5}" text-anchor="end" font-size="12" fill="#6b7280" font-weight="500">T${i+1}</text>`;
+        s += `<line x1="${ML}" y1="${y+LANE_H}" x2="${ML+chartW}" y2="${y+LANE_H}" stroke="#f0f0f0" stroke-width="1"/>`;
+    }
+
+    // 小时刻度线 + 标签
+    for (let h = 0; h <= 24; h++) {
+        const x = xOf(h * 60);
+        const major = h % 6 === 0;
+        s += `<line x1="${x}" y1="${MT}" x2="${x}" y2="${MT+lanes*LANE_H}" stroke="${major?'#e5e7eb':'#f3f4f6'}" stroke-width="${major?1.5:1}"/>`;
+        if (h < 24 || major) {
+            s += `<text x="${x}" y="${MT-6}" text-anchor="middle" font-size="${major?11:9}" fill="${major?'#6b7280':'#d1d5db'}">${String(h).padStart(2,'0')}</text>`;
+        }
+    }
+    // 分钟刻度（每15分钟）
+    for (let m = 0; m < 1440; m += 15) {
+        if (m % 60 === 0) continue;
+        const x = xOf(m);
+        s += `<line x1="${x}" y1="${MT}" x2="${x}" y2="${MT+8}" stroke="#e5e7eb" stroke-width="0.5"/>`;
+    }
+
+    // 任务条
+    allTasks.forEach((task, idx) => {
+        const lane = assignedLane[idx];
+        const x1 = xOf(task.started_minutes);
+        const x2 = xOf(task.completed_minutes || task.now_minutes);
+        const bw = Math.max(x2 - x1, 3);
+        const y = MT + lane * LANE_H + (LANE_H - BAR_H) / 2;
+        const color = task.type === 'running' ? '#3b82f6'
+                    : task.status === 'completed' ? '#10b981'
+                    : (task.status === 'failed' || task.status === 'timeout') ? '#ef4444'
+                    : '#6b7280';
+        const opacity = task.type === 'running' ? '1' : '0.82';
+        const tip = `${xmlEsc(task.display_name||task.task_name)}&#10;开始: ${hhmm(task.started_minutes)}&#10;时长: ${fmtDur(task.duration_minutes||(task.now_minutes-task.started_minutes))}${task.articles_found?'&#10;文章: '+task.articles_found:''}`;
+
+        s += `<rect x="${x1}" y="${y}" width="${bw}" height="${BAR_H}" rx="4" fill="${color}" opacity="${opacity}" data-tip="${tip}" class="gantt-bar" style="cursor:pointer"/>`;
+        if (bw > 52) {
+            const nm = task.display_name || task.task_name || '';
+            const lbl = nm.length > 9 ? nm.slice(0,9)+'…' : nm;
+            s += `<text x="${x1+6}" y="${y+BAR_H/2+4}" font-size="11" fill="white" font-weight="500" pointer-events="none">${xmlEsc(lbl)}</text>`;
+        }
+        // 运行中：右缘闪烁动画
+        if (task.type === 'running') {
+            s += `<rect x="${x1+bw-5}" y="${y}" width="5" height="${BAR_H}" rx="2" fill="white" opacity="0.35">
+                <animate attributeName="opacity" values="0.35;0.75;0.35" dur="1.4s" repeatCount="indefinite"/>
+            </rect>`;
+        }
+    });
+
+    // 边框
+    s += `<rect x="${ML}" y="${MT}" width="${chartW}" height="${lanes*LANE_H}" fill="none" stroke="#d1d5db" stroke-width="1" rx="2"/>`;
+
+    // 待触发区域标题
+    const pzY = MT + lanes * LANE_H + 4;
+    s += `<text x="${ML-8}" y="${pzY+18}" text-anchor="end" font-size="11" fill="#f59e0b" font-weight="600">待执行</text>`;
+    s += `<line x1="${ML}" y1="${pzY}" x2="${ML+chartW}" y2="${pzY}" stroke="#fef3c7" stroke-width="1.5"/>`;
+
+    // 待触发标记（菱形 + 时间标签）
+    const ptLabels = {}; // 同一位置叠加计数
+    data.pending_tasks.forEach(pt => {
+        const x = xOf(pt.next_minutes);
+        const key = Math.round(x);
+        ptLabels[key] = (ptLabels[key]||0) + 1;
+        const offset = (ptLabels[key]-1) * 14;
+        const dy = pzY + 12 + offset;
+        const sz = 6;
+        const tip2 = `${xmlEsc(pt.display_name)}&#10;计划触发: ${pt.next_run_display}`;
+        s += `<polygon points="${x},${dy} ${x+sz},${dy+sz} ${x},${dy+2*sz} ${x-sz},${dy+sz}" fill="#f59e0b" style="cursor:pointer" data-tip="${tip2}" class="gantt-bar"/>`;
+        s += `<text x="${x}" y="${dy+2*sz+11}" text-anchor="middle" font-size="9" fill="#d97706">${pt.next_run_display}</text>`;
+    });
+
+    // 当前时刻线（最上层）
+    s += `<line x1="${nowX}" y1="${MT-14}" x2="${nowX}" y2="${pzY+PENDING_ZONE-10}" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,3"/>`;
+    s += `<rect x="${nowX-22}" y="${MT-28}" width="44" height="16" rx="4" fill="#ef4444"/>`;
+    s += `<text x="${nowX}" y="${MT-17}" text-anchor="middle" font-size="10" fill="white" font-weight="700">${xmlEsc(data.current_time_display)}</text>`;
+
+    svg.innerHTML = s;
+
+    // 绑定 tooltip
+    svg.querySelectorAll('.gantt-bar').forEach(el => {
+        el.addEventListener('mousemove', e => showTip(e, el.dataset.tip));
+        el.addEventListener('mouseleave', hideTip);
+    });
+
+    document.getElementById('chartEmpty').style.display = allTasks.length === 0 ? '' : 'none';
+}
+
+// ── Tooltip ──
+const tipEl = document.getElementById('tooltip');
+function showTip(e, text) {
+    if (!text) return;
+    tipEl.innerHTML = text.replace(/&#10;/g,'<br>');
+    tipEl.style.display = 'block';
+    tipEl.style.left = (e.clientX + 14) + 'px';
+    tipEl.style.top  = (e.clientY - 10) + 'px';
+}
+function hideTip() { tipEl.style.display = 'none'; }
+document.addEventListener('mousemove', e => {
+    if (tipEl.style.display !== 'none') {
+        tipEl.style.left = (e.clientX + 14) + 'px';
+        tipEl.style.top  = (e.clientY - 10) + 'px';
+    }
+});
+
+// ── 运行中明细 ──
+function renderRunning(data) {
+    const el = document.getElementById('runningList');
+    if (!data.running_tasks.length) {
+        el.innerHTML = '<span style="color:#9ca3af;">当前没有运行中的任务</span>'; return;
+    }
+    let html = '<table style="width:100%;border-collapse:collapse;">';
+    html += '<tr style="border-bottom:1px solid #f0f0f0;"><th style="text-align:left;padding:6px 8px;color:#6b7280;font-weight:500;">网站/任务</th><th style="text-align:left;padding:6px 8px;color:#6b7280;font-weight:500;">域名</th><th style="text-align:left;padding:6px 8px;color:#6b7280;font-weight:500;">开始时间</th><th style="text-align:left;padding:6px 8px;color:#6b7280;font-weight:500;">已运行</th><th style="text-align:center;padding:6px 8px;color:#6b7280;font-weight:500;">状态</th></tr>';
+    data.running_tasks.forEach(t => {
+        html += `<tr style="border-bottom:1px solid #f9fafb;">
+            <td style="padding:7px 8px;font-weight:500;color:#1f2937;">${escH(t.display_name)}</td>
+            <td style="padding:7px 8px;color:#6b7280;font-size:12px;">${escH(t.domain)}</td>
+            <td style="padding:7px 8px;color:#6b7280;font-size:12px;">${hhmm(t.started_minutes)}</td>
+            <td style="padding:7px 8px;color:#6b7280;font-size:12px;">${fmtDur(t.duration_minutes)}</td>
+            <td style="padding:7px 8px;text-align:center;"><span class="badge badge-running"><i class="fa fa-circle" style="font-size:6px;"></i> 运行中</span></td>
+        </tr>`;
+    });
+    html += '</table>';
+    el.innerHTML = html;
+}
+
+// ── 待触发明细 ──
+function renderPending(data) {
+    const el = document.getElementById('pendingList');
+    if (!data.pending_tasks.length) {
+        el.innerHTML = '<span style="color:#9ca3af;">今日没有待触发的任务</span>'; return;
+    }
+    let html = '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
+    data.pending_tasks.forEach(pt => {
+        html += `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:6px 12px;font-size:12px;">
+            <span style="font-weight:600;color:#92400e;">${pt.next_run_display}</span>
+            <span style="color:#6b7280;margin-left:6px;">${escH(pt.display_name)}</span>
+        </div>`;
+    });
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── 保存并发数 ──
+async function saveConcurrent() {
+    const n = parseInt(document.getElementById('concInput').value) || 4;
+    try {
+        const res = await fetch('/api/thread-monitor/set-concurrent', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({max_concurrent: n})
+        });
+        const d = await res.json();
+        if (d.success) {
+            showToast(`并发数已设为 ${n}，立即生效`);
+            fetchAndRender();
+        }
+    } catch(e) { showToast('保存失败: '+e.message, false); }
+}
+
+function showToast(msg, ok=true) {
+    const t = document.createElement('div');
+    t.style.cssText = `position:fixed;top:20px;right:20px;z-index:9999;padding:10px 18px;border-radius:8px;color:#fff;font-size:13px;background:${ok?'#10b981':'#ef4444'};box-shadow:0 4px 12px rgba(0,0,0,.2);`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(()=>t.remove(), 3000);
+}
+
+// 窗口缩放时重绘
+window.addEventListener('resize', () => { if (lastData) renderChart(lastData); });
+
+// 初始加载
+fetchAndRender();
+</script>
+</body>
+</html>
