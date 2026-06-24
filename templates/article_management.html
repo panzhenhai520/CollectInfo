@@ -616,6 +616,79 @@
                 grid-template-columns: repeat(3, minmax(0, 1fr));
             }
         }
+
+        /* ── 在线助手侧栏 ── */
+        .chat-overlay {
+            position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:1000;
+            display:none;opacity:0;transition:opacity .25s;
+        }
+        .chat-overlay.open { display:block;opacity:1; }
+        .chat-drawer {
+            position:fixed;top:0;right:0;height:100vh;width:430px;max-width:100vw;
+            background:#fff;z-index:1001;
+            box-shadow:-4px 0 28px rgba(0,0,0,.14);
+            transform:translateX(100%);transition:transform .25s ease;
+            display:flex;flex-direction:column;
+        }
+        .chat-drawer.open { transform:translateX(0); }
+        .chat-model-tabs { display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid #f0f0f0;background:#fafafa; }
+        .chat-model-btn {
+            flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+            padding:5px 2px;border-radius:8px;border:2px solid transparent;
+            cursor:pointer;background:transparent;transition:all .15s;
+        }
+        .chat-model-btn:hover { background:#eff6ff;border-color:#93c5fd; }
+        .chat-model-btn.active { background:#eff6ff;border-color:#2563eb; }
+        .chat-model-btn img { width:30px;height:30px;border-radius:7px; }
+        .chat-model-label { font-size:10px;color:#374151;font-weight:600;line-height:1; }
+        .chat-messages {
+            flex:1;overflow-y:auto;padding:12px 14px;
+            display:flex;flex-direction:column;gap:12px;
+            background:#f8fafc;
+        }
+        .chat-msg-user { align-self:flex-end;max-width:82%; }
+        .chat-msg-ai   { align-self:flex-start;max-width:88%; }
+        .chat-bubble-user {
+            background:#2563eb;color:#fff;padding:8px 12px;
+            border-radius:12px 12px 2px 12px;font-size:13px;line-height:1.5;
+            word-break:break-word;
+        }
+        .chat-bubble-ai {
+            background:#fff;color:#1e293b;padding:8px 12px;
+            border-radius:12px 12px 12px 2px;font-size:13px;line-height:1.65;
+            white-space:pre-wrap;word-break:break-word;
+            border:1px solid #e5e7eb;
+        }
+        .chat-bubble-ai.streaming::after { content:'▌';animation:blink .7s step-start infinite; }
+        @keyframes blink { 50%{opacity:0;} }
+        .chat-msg-time { font-size:10px;color:#9ca3af;margin-top:3px;text-align:right; }
+        .chat-msg-ai .chat-msg-time { text-align:left; }
+        .chat-save-btn {
+            margin-top:5px;font-size:11px;color:#2563eb;background:none;border:none;cursor:pointer;
+            padding:2px 0;display:inline-flex;align-items:center;gap:3px;
+        }
+        .chat-save-btn:hover { text-decoration:underline; }
+        .chat-input-area {
+            padding:10px 12px;border-top:1px solid #e5e7eb;
+            display:flex;gap:8px;align-items:flex-end;background:#fff;
+        }
+        .chat-input {
+            flex:1;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;
+            font-size:13px;resize:none;outline:none;
+            min-height:38px;max-height:100px;line-height:1.5;font-family:inherit;
+        }
+        .chat-input:focus { border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12); }
+        .chat-send-btn {
+            padding:8px 14px;background:#2563eb;color:#fff;border:none;
+            border-radius:8px;cursor:pointer;font-size:13px;white-space:nowrap;
+            height:38px;flex-shrink:0;
+        }
+        .chat-send-btn:hover { background:#1d4ed8; }
+        .chat-send-btn:disabled { background:#93c5fd;cursor:not-allowed; }
+        .compact-action-btn.ai-action {
+            background:#f5f3ff;border-color:#ddd6fe;color:#6d28d9;
+        }
+        .compact-action-btn.ai-action:hover { background:#ede9fe;border-color:#c4b5fd; }
     </style>
     <script src="/static/js/opencc.min.js"></script>
 </head>
@@ -774,6 +847,9 @@
                         <option value="">所有域名</option>
                     </select>
                     <div class="article-actions">
+                        <button onclick="openChatDrawer('')" class="compact-action-btn ai-action" title="打开在线助手">
+                            <i class="fa fa-robot"></i><span>在线助手</span>
+                        </button>
                         <button onclick="refreshArticles()" class="compact-action-btn primary-action" title="刷新文章列表">
                             <i class="fa fa-sync"></i><span>刷新</span>
                         </button>
@@ -1126,6 +1202,8 @@
             displayKeywordMap(keywordMapData);
             updateKeywordSelection();
             loadArticles(1);
+            // 点击关键词时同步打开在线助手，以该关键词作为话题
+            if (selectedKeyword) openChatDrawer(selectedKeyword);
         }
 
         function clearKeywordSelection() {
@@ -1866,6 +1944,423 @@
         }
     </script>
     
+    <!-- 在线助手遮罩 -->
+    <div id="chatOverlay" class="chat-overlay" onclick="closeChatDrawer()"></div>
+
+    <!-- 在线助手侧栏 -->
+    <div id="chatDrawer" class="chat-drawer">
+        <!-- 头部 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;flex-shrink:0;">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <i class="fa fa-robot" style="font-size:16px;"></i>
+                <span style="font-weight:700;font-size:15px;">在线助手</span>
+                <span id="chatModelBadge" style="font-size:11px;background:rgba(255,255,255,.22);padding:1px 7px;border-radius:9999px;"></span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+                <button onclick="clearChatHistory()" title="清空对话" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:6px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;"><i class="fa fa-eraser"></i></button>
+                <button onclick="toggleChatConfig()" title="设置API密钥" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:6px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;"><i class="fa fa-cog"></i></button>
+                <button onclick="closeChatDrawer()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:6px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;"><i class="fa fa-times"></i></button>
+            </div>
+        </div>
+
+        <!-- 模型选择 -->
+        <div class="chat-model-tabs">
+            <button class="chat-model-btn" id="mBtn_doubao" onclick="selectChatModel('doubao')">
+                <img src="/static/img/ai/doubao.svg" alt="豆包"><span class="chat-model-label">豆包</span>
+            </button>
+            <button class="chat-model-btn" id="mBtn_deepseek" onclick="selectChatModel('deepseek')">
+                <img src="/static/img/ai/deepseek.svg" alt="DS"><span class="chat-model-label">DeepSeek</span>
+            </button>
+            <button class="chat-model-btn" id="mBtn_gemini" onclick="selectChatModel('gemini')">
+                <img src="/static/img/ai/gemini.svg" alt="Gem"><span class="chat-model-label">Gemini</span>
+            </button>
+            <button class="chat-model-btn" id="mBtn_chatgpt" onclick="selectChatModel('chatgpt')">
+                <img src="/static/img/ai/chatgpt.svg" alt="GPT"><span class="chat-model-label">ChatGPT</span>
+            </button>
+            <button class="chat-model-btn" id="mBtn_claude" onclick="selectChatModel('claude')">
+                <img src="/static/img/ai/claude.svg" alt="C"><span class="chat-model-label">Claude</span>
+            </button>
+        </div>
+
+        <!-- 设置面板（折叠） -->
+        <div id="chatConfigPanel" style="display:none;padding:10px 14px;background:#f8fafc;border-bottom:1px solid #e5e7eb;flex-shrink:0;">
+            <div style="font-size:12px;color:#374151;font-weight:600;margin-bottom:8px;">
+                <i class="fa fa-key mr-1 text-blue-600"></i>
+                <span id="cfgModelTitle">API 密钥配置</span>
+            </div>
+            <div style="display:flex;gap:6px;margin-bottom:6px;">
+                <input id="cfgApiKey" type="password" placeholder="输入 API Key" style="flex:1;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;outline:none;">
+                <button onclick="saveChatModelConfig()" style="padding:6px 10px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;">保存</button>
+            </div>
+            <div style="display:flex;gap:6px;margin-bottom:6px;">
+                <input id="cfgModelName" type="text" placeholder="模型名称（可选，留空用默认值）" style="flex:1;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;outline:none;">
+                <button onclick="testChatConnection()" id="testConnBtn" style="padding:6px 10px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;">连接测试</button>
+            </div>
+            <div style="margin-bottom:4px;">
+                <div style="font-size:11px;color:#6b7280;margin-bottom:3px;">RAGFlow 知识库 ID（保存对话需要）</div>
+                <div style="display:flex;gap:6px;">
+                    <input id="cfgKbId" type="text" placeholder="输入 kb_id" style="flex:1;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;outline:none;">
+                    <button onclick="saveKbConfig()" style="padding:6px 10px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;">保存</button>
+                </div>
+            </div>
+            <div id="cfgTestResult" style="font-size:11px;min-height:18px;margin-top:4px;"></div>
+        </div>
+
+        <!-- 话题标签 -->
+        <div id="chatTopicBar" style="display:none;padding:5px 14px;background:#eff6ff;border-bottom:1px solid #bfdbfe;flex-shrink:0;">
+            <span style="font-size:11px;color:#1d4ed8;"><i class="fa fa-tag mr-1"></i>当前话题：</span>
+            <span id="chatTopicLabel" style="font-size:11px;font-weight:700;color:#1e40af;"></span>
+            <button onclick="clearChatTopic()" style="margin-left:6px;font-size:10px;color:#6b7280;background:none;border:none;cursor:pointer;">× 取消</button>
+        </div>
+
+        <!-- 消息列表 -->
+        <div id="chatMessages" class="chat-messages"></div>
+
+        <!-- 输入区 -->
+        <div class="chat-input-area">
+            <textarea id="chatInput" class="chat-input" rows="2" placeholder="输入您的问题，Enter 发送，Shift+Enter 换行…" onkeydown="handleChatKeyDown(event)" oninput="autoResizeInput(this)"></textarea>
+            <button id="chatSendBtn" class="chat-send-btn" onclick="sendChatMessage()">
+                <i class="fa fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+    // ════════════════════════════════════════════════════════
+    //  在线助手 Chat 功能
+    // ════════════════════════════════════════════════════════
+    const chatState = {
+        activeModel: 'deepseek',
+        topic: '',
+        messages: [],       // [{role, content}]
+        isStreaming: false,
+        chatConfig: {},     // 从后端加载的配置
+    };
+
+    const MODEL_NAMES = {
+        doubao: '豆包', deepseek: 'DeepSeek', gemini: 'Gemini',
+        chatgpt: 'ChatGPT', claude: 'Claude',
+    };
+
+    // ── 初始化 ──
+    async function initChatConfig() {
+        try {
+            const res = await fetch('/api/chat/config');
+            const d = await res.json();
+            if (d.success) {
+                chatState.chatConfig = d.config;
+                chatState.activeModel = d.config.active_model || 'deepseek';
+                // 更新按钮状态
+                document.querySelectorAll('.chat-model-btn').forEach(b => b.classList.remove('active'));
+                const activeBtn = document.getElementById('mBtn_' + chatState.activeModel);
+                if (activeBtn) activeBtn.classList.add('active');
+                updateModelBadge();
+                // 填充 kb_id
+                if (document.getElementById('cfgKbId')) {
+                    document.getElementById('cfgKbId').value = d.config.ragflow_kb_id || '';
+                }
+            }
+        } catch(e) {}
+    }
+
+    function updateModelBadge() {
+        const badge = document.getElementById('chatModelBadge');
+        if (badge) badge.textContent = MODEL_NAMES[chatState.activeModel] || '';
+    }
+
+    // ── 开关侧栏 ──
+    function openChatDrawer(topic) {
+        chatState.topic = topic || '';
+        const topicBar = document.getElementById('chatTopicBar');
+        if (chatState.topic) {
+            topicBar.style.display = 'block';
+            document.getElementById('chatTopicLabel').textContent = chatState.topic;
+        } else {
+            topicBar.style.display = 'none';
+        }
+        document.getElementById('chatDrawer').classList.add('open');
+        document.getElementById('chatOverlay').classList.add('open');
+        document.body.style.overflow = 'hidden';
+
+        // 首次打开显示欢迎语
+        if (document.getElementById('chatMessages').children.length === 0) {
+            showWelcomeMessage();
+        }
+        setTimeout(() => document.getElementById('chatInput').focus(), 300);
+    }
+
+    function closeChatDrawer() {
+        document.getElementById('chatDrawer').classList.remove('open');
+        document.getElementById('chatOverlay').classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    function clearChatTopic() {
+        chatState.topic = '';
+        document.getElementById('chatTopicBar').style.display = 'none';
+    }
+
+    function clearChatHistory() {
+        chatState.messages = [];
+        document.getElementById('chatMessages').innerHTML = '';
+        showWelcomeMessage();
+    }
+
+    // ── 欢迎消息 ──
+    function showWelcomeMessage() {
+        const modelName = MODEL_NAMES[chatState.activeModel] || chatState.activeModel;
+        const welcome = `您好，我是石博士的助手，由 ${modelName} 提供支持，可以为您实时在线解答问题。\n\n` +
+            (chatState.topic ? `您当前选择的话题是「${chatState.topic}」，我将围绕这一主题为您提供专业分析和解答。` : '请输入您的问题，我将尽力为您提供专业解答。');
+        appendAiMessage(welcome, false, false);
+    }
+
+    // ── 模型切换 ──
+    function selectChatModel(modelId) {
+        chatState.activeModel = modelId;
+        document.querySelectorAll('.chat-model-btn').forEach(b => b.classList.remove('active'));
+        const btn = document.getElementById('mBtn_' + modelId);
+        if (btn) btn.classList.add('active');
+        updateModelBadge();
+        // 更新设置面板标题
+        const meta = (chatState.chatConfig.models || {})[modelId] || {};
+        document.getElementById('cfgModelTitle').textContent = `${MODEL_NAMES[modelId]} API 密钥配置${meta.has_key ? ' ✓已配置' : ' （未配置）'}`;
+        document.getElementById('cfgModelName').value = meta.model_id || '';
+        // 保存激活模型到后端
+        fetch('/api/chat/config', {method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({active_model: modelId})});
+    }
+
+    // ── 设置面板 ──
+    function toggleChatConfig() {
+        const panel = document.getElementById('chatConfigPanel');
+        const show = panel.style.display === 'none';
+        panel.style.display = show ? 'block' : 'none';
+        if (show) {
+            const meta = (chatState.chatConfig.models || {})[chatState.activeModel] || {};
+            document.getElementById('cfgModelTitle').textContent =
+                `${MODEL_NAMES[chatState.activeModel]} API 密钥配置${meta.has_key ? ' ✓已配置' : ' （未配置）'}`;
+            document.getElementById('cfgApiKey').value = '';
+            document.getElementById('cfgModelName').value = meta.model_id || '';
+            document.getElementById('cfgTestResult').textContent = '';
+        }
+    }
+
+    async function saveChatModelConfig() {
+        const apiKey = document.getElementById('cfgApiKey').value.trim();
+        const modelName = document.getElementById('cfgModelName').value.trim();
+        if (!apiKey) { showCfgResult('请输入 API Key', false); return; }
+        const res = await fetch('/api/chat/config', {method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({model_id: chatState.activeModel, api_key: apiKey, model_name: modelName})
+        });
+        const d = await res.json();
+        showCfgResult(d.message || (d.success ? '已保存' : '失败'), d.success);
+        if (d.success) initChatConfig();
+    }
+
+    async function testChatConnection() {
+        const btn = document.getElementById('testConnBtn');
+        btn.textContent = '测试中…';btn.disabled = true;
+        showCfgResult('正在连接…', null);
+        try {
+            const res = await fetch('/api/chat/test', {method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({model_id: chatState.activeModel})
+            });
+            const d = await res.json();
+            showCfgResult(d.message, d.success);
+        } catch(e) { showCfgResult('请求失败: '+e.message, false); }
+        btn.textContent = '连接测试';btn.disabled = false;
+    }
+
+    async function saveKbConfig() {
+        const kbId = document.getElementById('cfgKbId').value.trim();
+        const res = await fetch('/api/chat/config', {method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ragflow_kb_id: kbId})
+        });
+        const d = await res.json();
+        showCfgResult(kbId ? `知识库ID已保存` : '已清除知识库ID', d.success);
+        if (d.success) chatState.chatConfig.ragflow_kb_id = kbId;
+    }
+
+    function showCfgResult(msg, ok) {
+        const el = document.getElementById('cfgTestResult');
+        el.textContent = msg;
+        el.style.color = ok === true ? '#059669' : ok === false ? '#dc2626' : '#6b7280';
+    }
+
+    // ── 消息渲染 ──
+    function appendUserMessage(text) {
+        const container = document.getElementById('chatMessages');
+        const now = new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+        const div = document.createElement('div');
+        div.className = 'chat-msg-user';
+        div.innerHTML = `<div class="chat-bubble-user">${escapeHtmlChat(text)}</div><div class="chat-msg-time">${now}</div>`;
+        container.appendChild(div);
+        scrollChatBottom();
+        return div;
+    }
+
+    function appendAiMessage(text, streaming, showSave) {
+        const container = document.getElementById('chatMessages');
+        const now = new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+        const div = document.createElement('div');
+        div.className = 'chat-msg-ai';
+        const bubbleClass = 'chat-bubble-ai' + (streaming ? ' streaming' : '');
+        div.innerHTML = `<div class="${bubbleClass}">${escapeHtmlChat(text)}</div><div class="chat-msg-time">${now}` +
+            (showSave ? ` <button class="chat-save-btn" onclick="saveLastQA(this)"><i class="fa fa-save"></i> 保存到知识库</button>` : '') + `</div>`;
+        container.appendChild(div);
+        scrollChatBottom();
+        return div;
+    }
+
+    function scrollChatBottom() {
+        const c = document.getElementById('chatMessages');
+        c.scrollTop = c.scrollHeight;
+    }
+
+    function escapeHtmlChat(s) {
+        return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+    }
+
+    // ── 发送消息（流式） ──
+    async function sendChatMessage() {
+        if (chatState.isStreaming) return;
+        const input = document.getElementById('chatInput');
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+        autoResizeInput(input);
+
+        // 追加到 messages 历史
+        chatState.messages.push({role:'user', content: text});
+        appendUserMessage(text);
+
+        chatState.isStreaming = true;
+        const sendBtn = document.getElementById('chatSendBtn');
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+
+        // 创建 AI 消息气泡
+        const aiDiv = appendAiMessage('', true, false);
+        const bubble = aiDiv.querySelector('.chat-bubble-ai');
+        let fullResponse = '';
+
+        try {
+            const resp = await fetch('/api/chat/send', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    model: chatState.activeModel,
+                    topic: chatState.topic,
+                    messages: chatState.messages,
+                }),
+            });
+
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = '';
+
+            while (true) {
+                const {done, value} = await reader.read();
+                if (done) break;
+                buf += decoder.decode(value, {stream:true});
+                const lines = buf.split('\n');
+                buf = lines.pop();
+                for (const line of lines) {
+                    if (!line.startsWith('data:')) continue;
+                    const data_str = line.slice(5).trim();
+                    try {
+                        const ev = JSON.parse(data_str);
+                        if (ev.type === 'chunk') {
+                            fullResponse += ev.content;
+                            bubble.classList.add('streaming');
+                            bubble.innerHTML = escapeHtmlChat(fullResponse);
+                            scrollChatBottom();
+                        } else if (ev.type === 'done') {
+                            bubble.classList.remove('streaming');
+                        } else if (ev.type === 'error') {
+                            bubble.classList.remove('streaming');
+                            bubble.innerHTML = `<span style="color:#dc2626;"><i class="fa fa-exclamation-triangle mr-1"></i>${escapeHtmlChat(ev.message)}</span>`;
+                            fullResponse = '';
+                        }
+                    } catch(e2) {}
+                }
+            }
+            bubble.classList.remove('streaming');
+        } catch(e) {
+            bubble.classList.remove('streaming');
+            bubble.innerHTML = `<span style="color:#dc2626;"><i class="fa fa-exclamation-triangle mr-1"></i>请求失败: ${escapeHtmlChat(e.message)}</span>`;
+            fullResponse = '';
+        }
+
+        if (fullResponse) {
+            // 追加 AI 回复到历史
+            chatState.messages.push({role:'assistant', content: fullResponse});
+            // 显示保存按钮
+            const timeEl = aiDiv.querySelector('.chat-msg-time');
+            if (timeEl && !timeEl.querySelector('.chat-save-btn')) {
+                const saveBtn = document.createElement('button');
+                saveBtn.className = 'chat-save-btn';
+                saveBtn.innerHTML = '<i class="fa fa-save"></i> 保存到知识库';
+                saveBtn.onclick = () => saveLastQA(saveBtn, text, fullResponse);
+                timeEl.appendChild(saveBtn);
+            }
+        }
+
+        chatState.isStreaming = false;
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = '<i class="fa fa-paper-plane"></i>';
+        scrollChatBottom();
+    }
+
+    // ── 保存对话为文章 ──
+    async function saveLastQA(btn, question, answer) {
+        if (!question && chatState.messages.length >= 2) {
+            const last2 = chatState.messages.slice(-2);
+            question = last2[0]?.content || '';
+            answer = last2[1]?.content || '';
+        }
+        if (!question || !answer) { alert('没有可保存的对话内容'); return; }
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 保存中…';
+        const modelName = MODEL_NAMES[chatState.activeModel] || chatState.activeModel;
+        try {
+            const res = await fetch('/api/chat/save-article', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({question, answer, topic: chatState.topic, model_name: modelName})
+            });
+            const d = await res.json();
+            if (d.success) {
+                btn.innerHTML = '<i class="fa fa-check"></i> 已保存';
+                btn.style.color = '#059669';
+            } else {
+                btn.innerHTML = '<i class="fa fa-times"></i> 失败';
+                btn.style.color = '#dc2626';
+                btn.disabled = false;
+            }
+        } catch(e) {
+            btn.innerHTML = '<i class="fa fa-times"></i> 失败';
+            btn.style.color = '#dc2626';
+            btn.disabled = false;
+        }
+    }
+
+    // ── 键盘快捷键 ──
+    function handleChatKeyDown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+    }
+
+    function autoResizeInput(el) {
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+    }
+
+    // 初始化
+    initChatConfig();
+    </script>
+
     <!-- 文章内容查看模态框 -->
     <div id="articleModal" class="article-modal">
         <div class="article-modal-content">

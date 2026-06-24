@@ -54,6 +54,7 @@ from category_management_api import category_bp
 from config_management_api import config_management_bp
 from auth_management_api import auth_bp
 from user_management_api import user_bp
+from chat_api import chat_bp
 from user_database import UserDatabase
 try:
     import newspaper
@@ -128,6 +129,7 @@ app.register_blueprint(category_bp)
 app.register_blueprint(config_management_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(user_bp)
+app.register_blueprint(chat_bp)
 
 # Redis配置
 REDIS_HOST = config.REDIS_HOST
@@ -589,36 +591,58 @@ def thread_monitor_status():
             'status': 'running'
         })
 
-    # 3. 今日已完成任务
+    # 3. 今日任务（DB中查询，started_at 通常为 NULL，用 created_at 作为时间基准）
     completed_today = []
+    # 调度器内存已记录的 schedule_id，防止与 running_tasks 重复
+    running_sched_ids = {str(t.get('schedule_id')) for t in running_raw if t.get('schedule_id')}
+    import re as _re2
     try:
         with sqlite_db.lock:
             cur = sqlite_db.connection.cursor()
+            # started_at 字段通常为 NULL，以 created_at 作为时间基准
             cur.execute("""
-                SELECT ct.task_name, ct.target_url, ct.started_at, ct.completed_at,
-                       ct.status, ct.schedule_id, ct.articles_found
-                FROM crawl_tasks ct
-                WHERE (DATE(ct.started_at)=? OR DATE(ct.completed_at)=?)
-                  AND ct.status IN ('completed','failed','timeout','stopped')
-                ORDER BY ct.started_at LIMIT 300
-            """, (today_str, today_str))
+                SELECT id, task_id, task_name, target_url, status,
+                       COALESCE(started_at, created_at) AS effective_start,
+                       completed_at, articles_found
+                FROM crawl_tasks
+                WHERE DATE(COALESCE(started_at, created_at)) = ?
+                  AND status IN ('completed','failed','timeout','stopped','running','pending')
+                ORDER BY COALESCE(started_at, created_at) LIMIT 400
+            """, (today_str,))
             rows = [dict(r) for r in cur.fetchall()]
         for c in rows:
-            sm = parse_minutes(c.get('started_at'))
-            cm = parse_minutes(c.get('completed_at')) or now_minutes
+            # 从 task_id 提取 schedule_id（格式: schedule_XX_timestamp）
+            tid = c.get('task_id', '') or ''
+            m = _re2.match(r'schedule_(\d+)_', tid)
+            sid = int(m.group(1)) if m else None
+
+            # 调度器内存里已有的 running，跳过避免重复
+            if c.get('status') == 'running' and sid and str(sid) in running_sched_ids:
+                continue
+
+            sm = parse_minutes(c.get('effective_start'))
             if sm is None: continue
-            sid = c.get('schedule_id')
+
+            if c.get('status') in ('running', 'pending'):
+                cm = now_minutes
+                entry_type = 'running'
+                entry_status = 'running'
+            else:
+                cm = parse_minutes(c.get('completed_at')) or now_minutes
+                entry_type = 'completed'
+                entry_status = c.get('status', 'completed')
+
             sch = sch_map.get(sid, {})
-            display = sch.get('url_display_name') or sch.get('task_name') or c.get('task_name', '')
+            display = sch.get('url_display_name') or sch.get('task_name') or c.get('task_name', tid)
             completed_today.append({
                 'display_name': display,
                 'task_name': c.get('task_name', ''),
                 'started_minutes': round(max(0, sm), 2),
                 'completed_minutes': round(min(1440, cm), 2),
                 'duration_minutes': round(cm - sm, 1),
-                'status': c.get('status', 'completed'),
+                'status': entry_status,
                 'articles_found': c.get('articles_found') or 0,
-                'type': 'completed'
+                'type': entry_type,
             })
     except Exception as e:
         print(f'thread-monitor completed query error: {e}')

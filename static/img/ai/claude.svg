@@ -1,0 +1,10 @@
+<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="clg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#D97706"/>
+      <stop offset="100%" style="stop-color:#B45309"/>
+    </linearGradient>
+  </defs>
+  <rect width="40" height="40" rx="10" fill="url(#clg)"/>
+  <text x="20" y="28" font-family="Georgia,serif" font-size="24" font-weight="bold" fill="white" text-anchor="middle">C</text>
+</svg>
