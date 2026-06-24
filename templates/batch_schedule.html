@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>批量添加聚合关键词 - RAG内容聚合平台</title>
+    <link href="/static/css/tailwind.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/fontawesome.css">
+    <style>
+        .step-indicator { display: flex; align-items: center; gap: 0; }
+        .step-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; flex-shrink: 0; transition: all .2s; }
+        .step-line { flex: 1; height: 2px; min-width: 40px; }
+        .step-dot.active { background: #2563eb; color: white; }
+        .step-dot.done { background: #16a34a; color: white; }
+        .step-dot.pending { background: #e5e7eb; color: #9ca3af; }
+        .step-line.done { background: #16a34a; }
+        .step-line.pending { background: #e5e7eb; }
+        .kw-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 9999px; font-size: 13px; cursor: pointer; border: 1px solid #d1d5db; background: #f9fafb; transition: all .15s; }
+        .kw-chip:hover { background: #dbeafe; border-color: #93c5fd; }
+        .kw-chip.selected { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; }
+        .kw-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 9999px; font-size: 13px; background: #dbeafe; border: 1px solid #93c5fd; color: #1d4ed8; }
+        .url-checkbox-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+        .url-checkbox-row:hover { background: #f0f9ff; }
+        .url-checkbox-row label { cursor: pointer; }
+        .category-header { display: flex; align-items: center; gap-8px; padding: 8px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 4px; }
+        .param-label { font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 4px; display: block; }
+        .param-input { border: 1px solid #d1d5db; border-radius: 6px; padding: 7px 10px; font-size: 14px; width: 100%; outline: none; transition: border-color .15s; }
+        .param-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.2); }
+        .param-select { border: 1px solid #d1d5db; border-radius: 6px; padding: 7px 10px; font-size: 14px; width: 100%; background: white; outline: none; }
+        .hint { font-size: 12px; color: #6b7280; margin-top: 3px; }
+        .preview-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; background: #f8fafc; border: 1px solid #e5e7eb; margin-bottom: 4px; font-size: 13px; }
+        .btn-primary { background: #2563eb; color: white; border-radius: 8px; padding: 9px 20px; font-size: 14px; font-weight: 500; border: none; cursor: pointer; transition: background .15s; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-secondary { background: white; color: #374151; border: 1px solid #d1d5db; border-radius: 8px; padding: 9px 20px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background .15s; }
+        .btn-secondary:hover { background: #f9fafb; }
+        .section-card { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; }
+        .gradient-bg { background: linear-gradient(135deg,#2563eb 0%,#7c3aed 100%); }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- 顶部导航 -->
+<nav class="bg-white shadow-md">
+    <div class="container mx-auto px-4">
+        <div class="flex justify-between items-center py-4">
+            <div class="flex items-center">
+                <div class="gradient-bg p-2 rounded-lg mr-3">
+                    <i class="fa fa-book text-white text-xl"></i>
+                </div>
+                <h1 class="text-xl font-bold text-gray-800">RAG内容聚合平台</h1>
+            </div>
+            <div class="hidden md:flex space-x-6 items-center">
+                <a href="/" class="text-gray-600 hover:text-blue-600 transition-colors">控制台</a>
+                <a href="/schedule-management" class="text-gray-600 hover:text-blue-600 transition-colors">任务调度</a>
+                <a href="/article-management" class="text-gray-600 hover:text-blue-600 transition-colors">聚合结果</a>
+                <details class="relative">
+                    <summary class="list-none cursor-pointer text-gray-600 hover:text-blue-600 transition-colors">系统管理 <i class="fa fa-chevron-down text-xs ml-1"></i></summary>
+                    <div class="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1">
+                        <a href="/url-management" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">URL与分类管理</a>
+                        <a href="/batch-schedule" class="block px-4 py-2 text-sm text-blue-700 bg-blue-50 font-medium">批量添加聚合关键词</a>
+                        <a href="/schedule-execution-management" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">执行日志</a>
+                        <a href="/config-management" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">配置管理</a>
+                    </div>
+                </details>
+                <a href="/logout" class="text-gray-600 hover:text-red-600 transition-colors"><i class="fa fa-sign-out-alt mr-1"></i>退出登录</a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<main class="container mx-auto px-4 py-8 max-w-5xl">
+    <div class="mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">批量添加聚合关键词</h2>
+        <p class="text-gray-500 text-sm mt-1">选择关键词和目标 URL，一键批量创建定时调度任务</p>
+    </div>
+
+    <!-- 步骤指示器 -->
+    <div class="step-indicator mb-8 px-2">
+        <div class="flex flex-col items-center gap-1">
+            <div class="step-dot active" id="dot1">1</div>
+            <span class="text-xs font-medium text-blue-600" id="lbl1">关键词</span>
+        </div>
+        <div class="step-line pending" id="line12"></div>
+        <div class="flex flex-col items-center gap-1">
+            <div class="step-dot pending" id="dot2">2</div>
+            <span class="text-xs text-gray-400" id="lbl2">选择URL</span>
+        </div>
+        <div class="step-line pending" id="line23"></div>
+        <div class="flex flex-col items-center gap-1">
+            <div class="step-dot pending" id="dot3">3</div>
+            <span class="text-xs text-gray-400" id="lbl3">调度配置</span>
+        </div>
+        <div class="step-line pending" id="line34"></div>
+        <div class="flex flex-col items-center gap-1">
+            <div class="step-dot pending" id="dot4">4</div>
+            <span class="text-xs text-gray-400" id="lbl4">预览提交</span>
+        </div>
+    </div>
+
+    <!-- =================== STEP 1：关键词 =================== -->
+    <div id="step1" class="space-y-4">
+        <div class="section-card">
+            <h3 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <i class="fa fa-tags text-blue-500"></i> 系统现有关键词
+                <span class="text-xs text-gray-400 font-normal">（点击选中，再次点击取消）</span>
+            </h3>
+            <div id="existingKwPool" class="flex flex-wrap gap-2 min-h-[48px]">
+                <span class="text-gray-400 text-sm">加载中…</span>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <h3 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <i class="fa fa-edit text-green-500"></i> 手动输入关键词
+            </h3>
+            <div class="flex gap-2">
+                <input id="manualKwInput" type="text" class="param-input flex-1" placeholder="输入关键词，多个用逗号分隔，回车确认">
+                <button onclick="addManualKeywords()" class="btn-primary px-4">添加</button>
+            </div>
+            <p class="hint mt-2">支持中英文，多个关键词用逗号 , 隔开</p>
+        </div>
+
+        <div class="section-card">
+            <h3 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <i class="fa fa-check-circle text-blue-500"></i> 已选关键词
+                <span id="kwCount" class="ml-auto text-xs text-gray-400">0 个</span>
+                <button onclick="clearAllKeywords()" class="text-xs text-red-500 hover:underline">清空</button>
+            </h3>
+            <div id="selectedKwList" class="flex flex-wrap gap-2 min-h-[40px]">
+                <span class="text-gray-300 text-sm" id="kwEmptyHint">尚未选择任何关键词</span>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-3">
+            <button onclick="goStep(2)" class="btn-primary">下一步：选择 URL <i class="fa fa-arrow-right ml-1"></i></button>
+        </div>
+    </div>
+
+    <!-- =================== STEP 2：URL 选择 =================== -->
+    <div id="step2" class="space-y-4 hidden">
+        <div class="section-card">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+                    <i class="fa fa-link text-blue-500"></i> 选择目标 URL
+                </h3>
+                <div class="flex gap-2">
+                    <button onclick="selectAllUrls()" class="text-xs px-3 py-1.5 rounded border border-blue-300 text-blue-600 hover:bg-blue-50">全选所有</button>
+                    <button onclick="deselectAllUrls()" class="text-xs px-3 py-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50">取消全选</button>
+                </div>
+            </div>
+            <div id="urlGroupList" class="space-y-4">
+                <div class="text-gray-400 text-sm py-4 text-center">加载中…</div>
+            </div>
+        </div>
+
+        <div class="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
+            <i class="fa fa-info-circle"></i>
+            <span>已选 <strong id="selectedUrlCount">0</strong> 个 URL</span>
+        </div>
+
+        <div class="flex justify-between gap-3">
+            <button onclick="goStep(1)" class="btn-secondary"><i class="fa fa-arrow-left mr-1"></i> 上一步</button>
+            <button onclick="goStep(3)" class="btn-primary">下一步：调度配置 <i class="fa fa-arrow-right ml-1"></i></button>
+        </div>
+    </div>
+
+    <!-- =================== STEP 3：调度配置 =================== -->
+    <div id="step3" class="space-y-4 hidden">
+        <div class="section-card grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="md:col-span-2">
+                <label class="param-label">任务名称前缀 <span class="text-red-500">*</span></label>
+                <input id="cfgNamePrefix" type="text" class="param-input" placeholder="例：每日爬取_">
+                <p class="hint">最终任务名 = 前缀 + URL显示名，如 "每日爬取_信报"</p>
+            </div>
+
+            <div>
+                <label class="param-label">调度类型</label>
+                <select id="cfgScheduleType" class="param-select" onchange="onScheduleTypeChange()">
+                    <option value="daily">每天</option>
+                    <option value="weekly">每周</option>
+                    <option value="monthly">每月</option>
+                    <option value="once">仅一次</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="param-label">任务启动时间（基准时间）</label>
+                <input id="cfgScheduleTime" type="time" class="param-input" value="08:00" step="60">
+                <p class="hint">第 N 个 URL 的实际启动时间 = 基准时间 + N × 错峰间隔</p>
+            </div>
+
+            <!-- 每周执行日（weekly时显示） -->
+            <div id="weekdayRow" class="hidden md:col-span-2">
+                <label class="param-label">每周执行日</label>
+                <div class="flex flex-wrap gap-2">
+                    <label class="flex items-center gap-1 text-sm cursor-pointer"><input type="checkbox" class="wd-cb" value="0"> 周一</label>
+                    <label class="flex items-center gap-1 text-sm cursor-pointer"><input type="checkbox" class="wd-cb" value="1"> 周二</label>
+                    <label class="flex items-center gap-1 text-sm cursor-pointer"><input type="checkbox" class="wd-cb" value="2"> 周三</label>
+                    <label class="flex items-center gap-1 text-sm cursor-pointer"><input type="checkbox" class="wd-cb" value="3"> 周四</label>
+                    <label class="flex items-center gap-1 text-sm cursor-pointer"><input type="checkbox" class="wd-cb" value="4"> 周五</label>
+                    <label class="flex items-center gap-1 text-sm cursor-pointer"><input type="checkbox" class="wd-cb" value="5"> 周六</label>
+                    <label class="flex items-center gap-1 text-sm cursor-pointer"><input type="checkbox" class="wd-cb" value="6"> 周日</label>
+                </div>
+            </div>
+
+            <div>
+                <label class="param-label">错峰间隔（分钟）</label>
+                <input id="cfgStagger" type="number" class="param-input" value="5" min="0" max="60">
+                <p class="hint">每个 URL 任务之间延迟启动的分钟数，避免同时触发</p>
+            </div>
+
+            <div>
+                <label class="param-label">抓取天数限制</label>
+                <input id="cfgDaysLimit" type="number" class="param-input" value="7" min="0" max="3650">
+                <p class="hint">只抓取发布于最近 N 天内的文章（0=不限）</p>
+            </div>
+
+            <div>
+                <label class="param-label">冲突策略（on_overlap）</label>
+                <select id="cfgOnOverlap" class="param-select">
+                    <option value="skip">skip — 新触发时若旧任务仍在运行则跳过</option>
+                    <option value="stop_and_restart">stop_and_restart — 停止旧任务后立即启动新任务</option>
+                </select>
+                <p class="hint">推荐日报类任务选 stop_and_restart；大体量任务选 skip</p>
+            </div>
+
+            <div>
+                <label class="param-label">任务超时时限（小时）</label>
+                <input id="cfgTimeoutHours" type="number" class="param-input" value="24" min="1" max="168">
+                <p class="hint">任务运行超过此时限将被强制终止</p>
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="param-label">RAGFlow 知识库（可选）</label>
+                <select id="cfgRagflowKb" class="param-select">
+                    <option value="">不入库</option>
+                </select>
+                <p class="hint">选择后抓取的文章将自动上传至该知识库</p>
+            </div>
+        </div>
+
+        <div class="flex justify-between gap-3">
+            <button onclick="goStep(2)" class="btn-secondary"><i class="fa fa-arrow-left mr-1"></i> 上一步</button>
+            <button onclick="goStep(4)" class="btn-primary">预览任务 <i class="fa fa-arrow-right ml-1"></i></button>
+        </div>
+    </div>
+
+    <!-- =================== STEP 4：预览 & 提交 =================== -->
+    <div id="step4" class="space-y-4 hidden">
+        <div class="section-card">
+            <h3 class="font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <i class="fa fa-list-alt text-blue-500"></i> 即将创建的任务（<span id="previewCount">0</span> 个）
+            </h3>
+
+            <!-- 配置摘要 -->
+            <div class="mb-4 bg-gray-50 rounded-lg p-3 text-sm space-y-1 text-gray-600">
+                <div><span class="font-medium">关键词：</span><span id="sumKeywords">-</span></div>
+                <div><span class="font-medium">调度类型：</span><span id="sumSchedule">-</span></div>
+                <div><span class="font-medium">冲突策略：</span><span id="sumOverlap">-</span></div>
+                <div><span class="font-medium">超时时限：</span><span id="sumTimeout">-</span></div>
+                <div><span class="font-medium">抓取天数：</span><span id="sumDays">-</span></div>
+                <div><span class="font-medium">错峰间隔：</span><span id="sumStagger">-</span></div>
+            </div>
+
+            <div id="previewList" class="space-y-2 max-h-80 overflow-y-auto"></div>
+        </div>
+
+        <div id="submitResult" class="hidden"></div>
+
+        <div class="flex justify-between gap-3">
+            <button onclick="goStep(3)" class="btn-secondary" id="backBtn3"><i class="fa fa-arrow-left mr-1"></i> 上一步</button>
+            <button onclick="submitBatch()" id="submitBtn" class="btn-primary px-8">
+                <i class="fa fa-rocket mr-1"></i> 创建任务
+            </button>
+        </div>
+    </div>
+</main>
+
+<script>
+// ====== 状态 ======
+let selectedKeywords = new Set();
+let selectedUrlIds = new Set();
+let urlData = [];        // { id, name, url, category_id, category_name }
+let ragflowDatasets = [];
+
+// ====== 工具 ======
+function escHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showToast(msg, ok = true) {
+    const t = document.createElement('div');
+    t.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-white text-sm transition-all ${ok ? 'bg-green-600' : 'bg-red-600'}`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
+}
+
+// ====== 步骤切换 ======
+const stepIds = ['step1','step2','step3','step4'];
+function goStep(n) {
+    if (n === 2 && selectedKeywords.size === 0) {
+        if (!confirm('未选择任何关键词，确认继续？')) return;
+    }
+    if (n === 3 && selectedUrlIds.size === 0) {
+        showToast('请至少选择一个 URL', false); return;
+    }
+    if (n === 4) {
+        if (!document.getElementById('cfgNamePrefix').value.trim()) {
+            showToast('请填写任务名称前缀', false); return;
+        }
+        buildPreview();
+    }
+    stepIds.forEach((id, i) => {
+        document.getElementById(id).classList.toggle('hidden', i !== n - 1);
+    });
+    updateStepIndicator(n);
+}
+
+function updateStepIndicator(active) {
+    for (let i = 1; i <= 4; i++) {
+        const dot = document.getElementById('dot' + i);
+        const lbl = document.getElementById('lbl' + i);
+        dot.className = 'step-dot ' + (i < active ? 'done' : i === active ? 'active' : 'pending');
+        lbl.className = 'text-xs font-medium ' + (i === active ? 'text-blue-600' : i < active ? 'text-green-700' : 'text-gray-400');
+    }
+    for (let i = 1; i <= 3; i++) {
+        const line = document.getElementById(`line${i}${i+1}`);
+        if (line) line.className = 'step-line ' + (i < active ? 'done' : 'pending');
+    }
+}
+
+// ====== STEP 1：关键词 ======
+async function loadExistingKeywords() {
+    try {
+        const res = await fetch('/api/schedule-management/all-keywords');
+        const data = await res.json();
+        const pool = document.getElementById('existingKwPool');
+        if (!data.success || !data.keywords.length) {
+            pool.innerHTML = '<span class="text-gray-400 text-sm">系统暂无历史关键词</span>';
+            return;
+        }
+        pool.innerHTML = data.keywords.map(kw =>
+            `<span class="kw-chip" data-kw="${escHtml(kw)}" onclick="toggleExistingKw(this,'${escHtml(kw)}')">${escHtml(kw)}</span>`
+        ).join('');
+    } catch(e) {
+        document.getElementById('existingKwPool').innerHTML = '<span class="text-red-400 text-sm">加载失败</span>';
+    }
+}
+
+function toggleExistingKw(el, kw) {
+    if (selectedKeywords.has(kw)) {
+        selectedKeywords.delete(kw);
+        el.classList.remove('selected');
+    } else {
+        selectedKeywords.add(kw);
+        el.classList.add('selected');
+    }
+    renderSelectedKeywords();
+}
+
+function addManualKeywords() {
+    const raw = document.getElementById('manualKwInput').value;
+    raw.replace(/[，,]/g, ',').split(',').forEach(k => {
+        k = k.trim();
+        if (k) selectedKeywords.add(k);
+    });
+    document.getElementById('manualKwInput').value = '';
+    renderSelectedKeywords();
+    // 同步高亮现有词池
+    document.querySelectorAll('.kw-chip').forEach(chip => {
+        chip.classList.toggle('selected', selectedKeywords.has(chip.dataset.kw));
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('manualKwInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') addManualKeywords();
+    });
+});
+
+function renderSelectedKeywords() {
+    const container = document.getElementById('selectedKwList');
+    document.getElementById('kwCount').textContent = selectedKeywords.size + ' 个';
+    if (!selectedKeywords.size) {
+        container.innerHTML = '<span class="text-gray-300 text-sm">尚未选择任何关键词</span>';
+        return;
+    }
+    // 用 data-kw 属性传值，避免关键词含引号时 onclick 字符串拼接出错
+    container.innerHTML = [...selectedKeywords].map(kw =>
+        `<span class="kw-tag">${escHtml(kw)}<button data-kw="${escHtml(kw)}" onclick="removeKw(this)" class="ml-1 text-blue-400 hover:text-red-500">&times;</button></span>`
+    ).join('');
+}
+
+function removeKw(btn) {
+    const kw = btn.dataset.kw;
+    selectedKeywords.delete(kw);
+    document.querySelectorAll('.kw-chip').forEach(chip => {
+        if (chip.dataset.kw === kw) chip.classList.remove('selected');
+    });
+    renderSelectedKeywords();
+}
+
+function clearAllKeywords() {
+    selectedKeywords.clear();
+    document.querySelectorAll('.kw-chip').forEach(c => c.classList.remove('selected'));
+    renderSelectedKeywords();
+}
+
+// ====== STEP 2：URL 选择 ======
+async function loadUrlsGrouped() {
+    try {
+        const res = await fetch('/api/schedule-management/urls-grouped');
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+        urlData = [];
+        data.groups.forEach(g => g.urls.forEach(u => urlData.push({ ...u, category_name: g.category_name })));
+        renderUrlGroups(data.groups);
+    } catch(e) {
+        document.getElementById('urlGroupList').innerHTML = '<div class="text-red-400 text-sm py-4 text-center">加载失败: ' + escHtml(e.message) + '</div>';
+    }
+}
+
+function renderUrlGroups(groups) {
+    const container = document.getElementById('urlGroupList');
+    if (!groups.length) { container.innerHTML = '<div class="text-gray-400 text-sm">暂无 URL</div>'; return; }
+    container.innerHTML = groups.map((g, gi) => `
+        <div class="border border-gray-200 rounded-lg overflow-hidden">
+            <div class="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-200 cursor-pointer select-none"
+                 onclick="toggleCatCollapse(event,${gi})">
+                <input type="checkbox" class="cat-cb w-4 h-4 rounded" data-cat="${g.category_id}"
+                       onchange="toggleCategory(this,${g.category_id})" onclick="event.stopPropagation()">
+                <span class="font-medium text-sm text-gray-700">${escHtml(g.category_name)}</span>
+                <span class="text-xs text-gray-400 ml-1">${g.urls.length} 个</span>
+                <svg id="collapseIcon${gi}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                     style="width:14px;height:14px;margin-left:auto;color:#9ca3af;transition:transform .2s;flex-shrink:0">
+                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
+                </svg>
+            </div>
+            <div id="catBody${gi}" class="divide-y divide-gray-100">
+                ${g.urls.map(u => `
+                    <div class="url-checkbox-row">
+                        <input type="checkbox" class="url-cb w-4 h-4 rounded" value="${u.id}" data-cat="${g.category_id}" onchange="onUrlCbChange()">
+                        <div class="min-w-0">
+                            <div class="text-sm font-medium text-gray-800 truncate">${escHtml(u.name)}</div>
+                            <div class="text-xs text-gray-400 truncate">${escHtml(u.url)}</div>
+                        </div>
+                    </div>`).join('')}
+            </div>
+        </div>`).join('');
+    onUrlCbChange();
+}
+
+function toggleCatCollapse(event, gi) {
+    // 点到 checkbox 本身时不折叠
+    if (event.target.type === 'checkbox') return;
+    const body = document.getElementById('catBody' + gi);
+    const icon = document.getElementById('collapseIcon' + gi);
+    const isHidden = body.style.display === 'none';
+    body.style.display = isHidden ? '' : 'none';
+    icon.style.transform = isHidden ? '' : 'rotate(-180deg)';
+}
+
+function toggleCategory(catCb, catId) {
+    const checked = catCb.checked;
+    document.querySelectorAll(`.url-cb[data-cat="${catId}"]`).forEach(cb => {
+        cb.checked = checked;
+        if (checked) selectedUrlIds.add(parseInt(cb.value));
+        else selectedUrlIds.delete(parseInt(cb.value));
+    });
+    updateUrlCount();
+}
+
+function onUrlCbChange() {
+    selectedUrlIds.clear();
+    document.querySelectorAll('.url-cb:checked').forEach(cb => selectedUrlIds.add(parseInt(cb.value)));
+    // 同步分类全选状态
+    document.querySelectorAll('.cat-cb').forEach(catCb => {
+        const catId = catCb.dataset.cat;
+        const total = document.querySelectorAll(`.url-cb[data-cat="${catId}"]`).length;
+        const checked = document.querySelectorAll(`.url-cb[data-cat="${catId}"]:checked`).length;
+        catCb.indeterminate = checked > 0 && checked < total;
+        catCb.checked = checked === total && total > 0;
+    });
+    updateUrlCount();
+}
+
+function selectAllUrls() {
+    document.querySelectorAll('.url-cb').forEach(cb => { cb.checked = true; selectedUrlIds.add(parseInt(cb.value)); });
+    document.querySelectorAll('.cat-cb').forEach(cb => { cb.checked = true; cb.indeterminate = false; });
+    updateUrlCount();
+}
+
+function deselectAllUrls() {
+    document.querySelectorAll('.url-cb').forEach(cb => { cb.checked = false; });
+    document.querySelectorAll('.cat-cb').forEach(cb => { cb.checked = false; cb.indeterminate = false; });
+    selectedUrlIds.clear();
+    updateUrlCount();
+}
+
+function updateUrlCount() {
+    document.getElementById('selectedUrlCount').textContent = selectedUrlIds.size;
+}
+
+// ====== STEP 3：调度类型切换 ======
+function onScheduleTypeChange() {
+    const t = document.getElementById('cfgScheduleType').value;
+    document.getElementById('weekdayRow').classList.toggle('hidden', t !== 'weekly');
+}
+
+async function loadRagflowDatasets() {
+    try {
+        const res = await fetch('/api/schedule-management/ragflow/datasets');
+        const data = await res.json();
+        const sel = document.getElementById('cfgRagflowKb');
+        if (data.success && data.configured && data.datasets?.length) {
+            data.datasets.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.id; opt.textContent = d.name;
+                sel.appendChild(opt);
+            });
+        }
+    } catch(e) {}
+}
+
+// ====== STEP 4：预览 ======
+const scheduleTypeLabel = { daily:'每天', weekly:'每周', monthly:'每月', once:'仅一次' };
+const overlapLabel = { skip:'skip（跳过）', stop_and_restart:'stop_and_restart（停旧启新）' };
+
+function buildPreview() {
+    const prefix = document.getElementById('cfgNamePrefix').value.trim();
+    const schedType = document.getElementById('cfgScheduleType').value;
+    const schedTime = document.getElementById('cfgScheduleTime').value;
+    const stagger = parseInt(document.getElementById('cfgStagger').value) || 0;
+    const onOverlap = document.getElementById('cfgOnOverlap').value;
+    const timeout = document.getElementById('cfgTimeoutHours').value;
+    const days = document.getElementById('cfgDaysLimit').value;
+    const keywords = [...selectedKeywords].join(',');
+
+    // 摘要
+    document.getElementById('sumKeywords').textContent = keywords || '（无关键词）';
+    document.getElementById('sumSchedule').textContent = `${scheduleTypeLabel[schedType] || schedType} ${schedTime}`;
+    document.getElementById('sumOverlap').textContent = overlapLabel[onOverlap] || onOverlap;
+    document.getElementById('sumTimeout').textContent = timeout + ' 小时';
+    document.getElementById('sumDays').textContent = days + ' 天';
+    document.getElementById('sumStagger').textContent = stagger + ' 分钟';
+
+    // 任务列表
+    const selected = urlData.filter(u => selectedUrlIds.has(u.id));
+    document.getElementById('previewCount').textContent = selected.length;
+
+    let [h, m] = schedTime.split(':').map(Number);
+    const list = document.getElementById('previewList');
+    list.innerHTML = selected.map((u, idx) => {
+        const offset = idx * stagger;
+        const launchH = String(Math.floor((h * 60 + m + offset) / 60) % 24).padStart(2,'0');
+        const launchM = String((m + offset) % 60).padStart(2,'0');
+        return `<div class="preview-row">
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex-shrink-0">${idx+1}</span>
+            <div class="min-w-0 flex-1">
+                <div class="font-medium text-gray-800 truncate">${escHtml(prefix + u.name)}</div>
+                <div class="text-xs text-gray-400 truncate">${escHtml(u.url)}</div>
+            </div>
+            <span class="text-xs text-gray-500 flex-shrink-0 ml-2">${launchH}:${launchM}</span>
+        </div>`;
+    }).join('');
+
+    document.getElementById('submitResult').classList.add('hidden');
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('submitBtn').textContent = '创建任务';
+}
+
+// ====== 提交 ======
+async function submitBatch() {
+    const prefix = document.getElementById('cfgNamePrefix').value.trim();
+    const schedType = document.getElementById('cfgScheduleType').value;
+    const schedTime = document.getElementById('cfgScheduleTime').value + ':00';
+    const stagger = parseInt(document.getElementById('cfgStagger').value) || 0;
+    const onOverlap = document.getElementById('cfgOnOverlap').value;
+    const timeout = parseInt(document.getElementById('cfgTimeoutHours').value) || 24;
+    const days = parseInt(document.getElementById('cfgDaysLimit').value) || 7;
+    const keywords = [...selectedKeywords].join(',');
+    const ragflowKb = document.getElementById('cfgRagflowKb').value || null;
+    const weekdays = [...document.querySelectorAll('.wd-cb:checked')].map(c => c.value).join(',');
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin mr-1"></i> 创建中…';
+
+    try {
+        const res = await fetch('/api/schedule-management/batch-create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                url_ids: [...selectedUrlIds],
+                task_name_prefix: prefix,
+                keywords,
+                schedule_type: schedType,
+                schedule_time: schedTime,
+                schedule_weekdays: weekdays,
+                stagger_minutes: stagger,
+                on_overlap: onOverlap,
+                task_timeout_hours: timeout,
+                days_limit: days,
+                ragflow_kb_id: ragflowKb,
+                task_type: 'crawl',
+            })
+        });
+        const data = await res.json();
+        const resultEl = document.getElementById('submitResult');
+        resultEl.classList.remove('hidden');
+        if (data.success) {
+            resultEl.className = 'bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-800';
+            resultEl.innerHTML = `<i class="fa fa-check-circle mr-1"></i> ${escHtml(data.message)}
+                <a href="/schedule-management" class="ml-3 text-green-700 underline font-medium">查看任务调度 →</a>
+                ${data.errors.length ? '<div class="mt-2 text-red-600">' + data.errors.map(escHtml).join('<br>') + '</div>' : ''}`;
+            document.getElementById('backBtn3').classList.add('hidden');
+            btn.innerHTML = '<i class="fa fa-check mr-1"></i> 已创建';
+        } else {
+            resultEl.className = 'bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800';
+            resultEl.innerHTML = '<i class="fa fa-times-circle mr-1"></i> ' + escHtml(data.error || '创建失败');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa fa-rocket mr-1"></i> 重试';
+        }
+    } catch(e) {
+        showToast('网络错误: ' + e.message, false);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-rocket mr-1"></i> 创建任务';
+    }
+}
+
+// ====== 初始化 ======
+loadExistingKeywords();
+loadUrlsGrouped();
+loadRagflowDatasets();
+</script>
+</body>
+</html>

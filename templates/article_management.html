@@ -1,0 +1,1952 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聚合结果 - RAG内容聚合平台</title>
+    <link href="/static/css/tailwind.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/fontawesome.css">
+    <style>
+        .primary { color: #3B82F6; }
+        .text-primary { color: #3B82F6 !important; }
+        .bg-primary { background-color: #3B82F6; }
+        .hover\:bg-primary:hover { background-color: #2563EB; }
+        .hover\:bg-primary\/90:hover { background-color: #2563EB; }
+        .hover\:text-primary\/80:hover { color: #2563EB !important; }
+        
+        /* 卡片阴影 */
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        /* 渐变背景样式 */
+        .gradient-bg {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        }
+        
+        /* 文字颜色 */
+        .text-dark { color: #1e293b; }
+
+        .article-management-panel {
+            border: 1px solid #e5e7eb;
+        }
+
+        .article-filter-panel {
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .article-filter-grid {
+            display: grid;
+            grid-template-columns: minmax(240px, 1.4fr) repeat(3, minmax(130px, 0.75fr)) auto;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .filter-control {
+            width: 100%;
+            min-height: 34px;
+            padding: 7px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: #fff;
+            color: #111827;
+            font-size: 12px;
+            outline: none;
+        }
+
+        .filter-control:focus {
+            border-color: #3B82F6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.12);
+        }
+
+        .search-control {
+            padding-left: 30px;
+        }
+
+        .article-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: flex-end;
+            align-items: center;
+        }
+
+        .keyword-map-panel {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+
+        .keyword-map-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .keyword-map-grid {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            min-height: 260px;
+            padding: 18px 8px;
+            border-radius: 8px;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.08), transparent 26%),
+                radial-gradient(circle at 80% 30%, rgba(16, 185, 129, 0.08), transparent 24%),
+                #ffffff;
+        }
+
+        .keyword-node {
+            width: var(--bubble-size, 112px);
+            height: var(--bubble-size, 112px);
+            min-width: var(--bubble-size, 112px);
+            border: 1px solid rgba(37, 99, 235, 0.22);
+            border-radius: 999px;
+            background: radial-gradient(circle at 35% 28%, #ffffff 0%, #dbeafe 46%, #93c5fd 100%);
+            padding: 12px;
+            text-align: center;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+        }
+
+        .keyword-node:hover {
+            transform: translateY(-2px) scale(1.03);
+            border-color: #2563eb;
+            box-shadow: 0 12px 28px rgba(37, 99, 235, 0.18);
+        }
+
+        .keyword-node.active {
+            border-color: #2563eb;
+            background: radial-gradient(circle at 35% 28%, #ffffff 0%, #bfdbfe 42%, #3b82f6 100%);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16), 0 14px 32px rgba(37, 99, 235, 0.22);
+        }
+
+        .keyword-node-name {
+            display: block;
+            color: #1e293b;
+            font-size: var(--bubble-label-size, 14px);
+            font-weight: 700;
+            line-height: 1.25;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 92%;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .keyword-node-count {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 3px;
+            margin-top: 7px;
+            color: #1d4ed8;
+            font-weight: 800;
+        }
+
+        .keyword-node-count strong {
+            font-size: var(--node-count-size, 22px);
+            line-height: 1;
+        }
+
+        .keyword-node-meta {
+            margin-top: 5px;
+            color: #64748b;
+            font-size: 10px;
+            line-height: 1.35;
+        }
+
+        .keyword-selected-bar {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 9px 10px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            color: #1e40af;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .keyword-selected-bar.active {
+            display: flex;
+        }
+
+        .compact-action-btn {
+            min-height: 34px;
+            padding: 0 10px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+        }
+
+        .compact-action-btn.primary-action {
+            background: #3B82F6;
+            color: #fff;
+        }
+
+        .compact-action-btn.primary-action:hover {
+            background: #2563EB;
+        }
+
+        .compact-action-btn.success-action {
+            background: #ecfdf5;
+            border-color: #bbf7d0;
+            color: #047857;
+        }
+
+        .compact-action-btn.success-action:hover {
+            background: #d1fae5;
+            border-color: #86efac;
+        }
+
+        .compact-action-btn.danger-action {
+            background: #fef2f2;
+            border-color: #fecaca;
+            color: #b91c1c;
+        }
+
+        .compact-action-btn.danger-action:hover {
+            background: #fee2e2;
+            border-color: #fca5a5;
+        }
+
+        .keyword-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .keyword-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            max-width: 100%;
+            padding: 2px 7px;
+            border-radius: 999px;
+            border: 1px solid transparent;
+            font-size: 11px;
+            line-height: 1.35;
+            font-weight: 600;
+        }
+
+        .keyword-badge-title {
+            background: #fffbeb;
+            border-color: #fde68a;
+            color: #92400e;
+        }
+
+        .keyword-badge-content {
+            background: #eff6ff;
+            border-color: #bfdbfe;
+            color: #1d4ed8;
+        }
+
+        .keyword-badge-unknown {
+            background: #f3f4f6;
+            border-color: #e5e7eb;
+            color: #4b5563;
+        }
+
+        .keyword-empty {
+            color: #9ca3af;
+            font-size: 12px;
+        }
+
+        .article-list-header,
+        .article-list-row {
+            display: grid;
+            grid-template-columns: 44px minmax(0, 1fr) minmax(160px, 220px) 96px;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .article-list-header {
+            padding: 8px 10px;
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 700;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .task-origin-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            max-width: 100%;
+            color: #2563eb;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .task-origin-link:hover {
+            color: #1d4ed8;
+            text-decoration: underline;
+        }
+
+        .task-origin-empty {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: #9ca3af;
+            font-size: 12px;
+        }
+
+        .article-row-number {
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .article-view-toolbar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .view-toggle {
+            display: inline-flex;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .view-toggle-btn {
+            width: 34px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            border-right: 1px solid #e5e7eb;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+
+        .view-toggle-btn:last-child {
+            border-right: 0;
+        }
+
+        .view-toggle-btn.active {
+            background: #2563eb;
+            color: #fff;
+        }
+
+        .article-card-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .article-card {
+            height: 230px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #fff;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            cursor: pointer;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+        }
+
+        .article-card:hover {
+            border-color: #93c5fd;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .article-card-title {
+            width: 100%;
+            min-height: 40px;
+            color: #1e293b;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.45;
+            text-align: left;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .article-card-preview {
+            flex: 1;
+            overflow: hidden;
+            color: #475569;
+            font-size: 12px;
+            line-height: 1.55;
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+        }
+
+        .article-card-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            color: #64748b;
+            font-size: 11px;
+        }
+
+        .article-card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding-top: 6px;
+            border-top: 1px solid #f1f5f9;
+        }
+        
+        /* 文章内容模态框样式 */
+        .article-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        
+        .article-modal.active {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 24px 12px;
+        }
+        
+        .article-modal-content {
+            background: white;
+            border-radius: 8px;
+            max-width: 980px;
+            width: 100%;
+            max-height: 92vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        .article-modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .article-modal-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            font-size: 15px;
+            line-height: 1;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+
+        .article-modal-close:hover {
+            background: #f1f5f9;
+            color: #1f2937;
+        }
+        
+        .article-modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .article-modal-footer {
+            padding: 12px 20px;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        
+        .article-content-display {
+            line-height: 1.8;
+            color: #374151;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        
+        .article-meta {
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+        
+        .article-meta-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 8px 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            background: #fff;
+        }
+
+        .article-meta-item.full {
+            grid-column: 1 / -1;
+        }
+        
+        .article-meta-label {
+            font-weight: 600;
+            color: #6b7280;
+            width: 90px;
+            flex-shrink: 0;
+            font-size: 12px;
+        }
+        
+        .article-meta-value {
+            color: #111827;
+            flex: 1;
+            word-break: break-all;
+            font-size: 12px;
+        }
+
+        @media (max-width: 640px) {
+            .article-modal.active {
+                padding: 12px;
+            }
+            .article-modal-header,
+            .article-modal-body,
+            .article-modal-footer {
+                padding-left: 14px;
+                padding-right: 14px;
+            }
+            .article-modal-header h3 {
+                font-size: 1rem;
+                line-height: 1.5rem;
+            }
+            .article-meta-item {
+                display: block;
+            }
+            .article-filter-grid,
+            .article-meta {
+                grid-template-columns: 1fr;
+            }
+            .keyword-map-header,
+            .keyword-selected-bar {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+            .article-list-header {
+                display: none;
+            }
+            .article-list-row {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+            .article-card-grid {
+                grid-template-columns: 1fr;
+            }
+            .article-row-number {
+                display: inline-flex;
+                align-items: center;
+                width: fit-content;
+                min-width: 26px;
+                padding: 2px 6px;
+                border-radius: 999px;
+                background: #f1f5f9;
+            }
+            .article-actions {
+                justify-content: flex-start;
+            }
+            .article-meta-label {
+                width: auto;
+                margin-bottom: 2px;
+            }
+            .article-content-display {
+                padding: 12px;
+                font-size: 0.875rem;
+            }
+        }
+
+        @media (min-width: 641px) and (max-width: 900px) {
+            .article-card-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (min-width: 901px) and (max-width: 1200px) {
+            .article-card-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+    </style>
+    <script src="/static/js/opencc.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- 顶部导航栏 -->
+    <nav class="bg-white shadow-md">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <div class="gradient-bg p-2 rounded-lg mr-3">
+                        <i class="fa fa-book text-white text-xl"></i>
+                    </div>
+                    <h1 class="text-xl font-bold text-dark">RAG内容聚合平台</h1>
+                </div>
+                
+                <!-- 桌面端导航链接 -->
+                <div class="hidden md:flex space-x-6 items-center">
+                    <a href="/" class="text-gray-600 hover:text-primary transition-colors">控制台</a>
+                    <a href="/schedule-management" class="text-gray-600 hover:text-blue-600 transition-colors">任务调度</a>
+                    <a href="/article-management" class="text-gray-600 hover:text-blue-600 transition-colors">聚合结果</a>
+                    <details class="relative">
+                        <summary class="list-none cursor-pointer text-gray-600 hover:text-blue-600 transition-colors">系统管理 <i class="fa fa-chevron-down text-xs ml-1"></i></summary>
+                        <div class="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1">
+                            <a href="/url-management" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">URL与分类管理</a>
+                            <a href="/batch-schedule" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">批量任务</a>
+                            <a href="/schedule-execution-management" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">执行日志</a>
+                            <a href="/config-management" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">配置管理</a>
+                        </div>
+                    </details>
+                    <!-- <a href="/user-management" class="text-gray-600 hover:text-primary transition-colors">用户管理</a> -->
+                    <a href="/logout" class="text-gray-600 hover:text-red-600 transition-colors">
+                        <i class="fa fa-sign-out-alt mr-1"></i>退出登录
+                    </a>
+                </div>
+                
+                <!-- 移动端菜单按钮 -->
+                <button id="menuBtn" class="md:hidden text-gray-600 hover:text-primary">
+                    <i class="fa fa-bars text-xl"></i>
+                </button>
+            </div>
+            
+            <!-- 移动端菜单 -->
+            <div id="mobileMenu" class="md:hidden hidden pb-4">
+                <a href="/" class="block py-2 text-gray-600 hover:text-primary">控制台</a>
+                <a href="/schedule-management" class="block py-2 text-gray-600 hover:text-blue-600">任务调度</a>
+                <a href="/article-management" class="block py-2 text-gray-600 hover:text-blue-600">聚合结果</a>
+                <details class="py-2">
+                    <summary class="list-none cursor-pointer text-gray-600 hover:text-blue-600">系统管理 <i class="fa fa-chevron-down text-xs ml-1"></i></summary>
+                    <div class="pl-4 mt-1 space-y-1">
+                        <a href="/url-management" class="block py-1 text-sm text-gray-600 hover:text-blue-600">URL与分类管理</a>
+                        <a href="/schedule-execution-management" class="block py-1 text-sm text-gray-600 hover:text-blue-600">执行日志</a>
+                        <a href="/config-management" class="block py-1 text-sm text-gray-600 hover:text-blue-600">配置管理</a>
+                    </div>
+                </details>
+                <!-- <a href="/user-management" class="block py-2 text-gray-600 hover:text-primary">用户管理</a> -->
+                <a href="/logout" class="block py-2 text-gray-600 hover:text-red-600">
+                    <i class="fa fa-sign-out-alt mr-1"></i>退出登录
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-8">
+        <section class="mb-5">
+        <!-- 统计信息卡片 -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+            <div class="bg-white px-3 py-2 rounded-lg card-shadow border-l-4 border-blue-500">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="min-w-0 flex items-baseline gap-2">
+                        <p class="text-xs text-gray-500 whitespace-nowrap">总文章数</p>
+                        <p id="totalArticles" class="text-lg font-bold text-gray-900 leading-none">0</p>
+                    </div>
+                    <div class="bg-blue-50 w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0">
+                        <i class="fa fa-file-text text-blue-600 text-sm"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white px-3 py-2 rounded-lg card-shadow border-l-4 border-green-500">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="min-w-0 flex items-baseline gap-2">
+                        <p class="text-xs text-gray-500 whitespace-nowrap">域名数</p>
+                        <p id="totalDomains" class="text-lg font-bold text-gray-900 leading-none">0</p>
+                    </div>
+                    <div class="bg-green-50 w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0">
+                        <i class="fa fa-globe text-green-600 text-sm"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white px-3 py-2 rounded-lg card-shadow border-l-4 border-yellow-500">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="min-w-0 flex items-baseline gap-2">
+                        <p class="text-xs text-gray-500 whitespace-nowrap">最后爬取</p>
+                        <p id="lastCrawl" class="text-xs font-semibold text-gray-900 leading-none truncate">-</p>
+                    </div>
+                    <div class="bg-yellow-50 w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0">
+                        <i class="fa fa-clock text-yellow-600 text-sm"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white px-3 py-2 rounded-lg card-shadow border-l-4 border-purple-500">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="min-w-0 flex items-baseline gap-2">
+                        <p class="text-xs text-gray-500 whitespace-nowrap">今日新增</p>
+                        <p id="todayNew" class="text-lg font-bold text-gray-900 leading-none">0</p>
+                    </div>
+                    <div class="bg-purple-50 w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0">
+                        <i class="fa fa-calendar text-purple-600 text-sm"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 聚合结果区域 -->
+        <div class="bg-white rounded-lg p-3 card-shadow article-management-panel">
+            <div class="keyword-map-panel">
+                <div class="keyword-map-header">
+                    <div>
+                        <h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
+                            <i class="fa fa-sitemap text-blue-600"></i>
+                            关键词信息图谱
+                        </h2>
+                        <p class="text-xs text-gray-500 mt-1">点击关键词节点查看对应采集文章</p>
+                    </div>
+                    <button id="clearKeywordBtn" onclick="clearKeywordSelection()" class="compact-action-btn success-action hidden" title="清除关键词筛选">
+                        <i class="fa fa-times"></i><span>显示图谱</span>
+                    </button>
+                </div>
+                <div id="keywordMapContainer" class="keyword-map-grid">
+                    <div class="col-span-full p-6 text-center text-gray-500">
+                        <i class="fa fa-spinner fa-spin text-2xl text-blue-500 mb-2 block"></i>
+                        <p class="text-xs">正在加载关键词图谱...</p>
+                    </div>
+                </div>
+            </div>
+            <!-- 搜索和筛选 -->
+            <div class="article-filter-panel">
+                <div class="article-filter-grid">
+                    <div>
+                        <div class="relative">
+                            <input type="text" id="searchInput" placeholder="搜索关键词或文章标题..."
+                                   class="filter-control search-control">
+                            <div class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                                <i class="fa fa-search text-gray-400 text-xs"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <select id="categoryFilter" class="filter-control">
+                        <option value="">所有分类</option>
+                    </select>
+                    <select id="sourceUrlFilter" class="filter-control">
+                        <option value="">所有来源</option>
+                    </select>
+                    <select id="domainFilter" class="filter-control">
+                        <option value="">所有域名</option>
+                    </select>
+                    <div class="article-actions">
+                        <button onclick="refreshArticles()" class="compact-action-btn primary-action" title="刷新文章列表">
+                            <i class="fa fa-sync"></i><span>刷新</span>
+                        </button>
+                        <button onclick="exportArticles()" class="compact-action-btn success-action" title="按当前筛选条件导出">
+                            <i class="fa fa-download"></i><span>导出</span>
+                        </button>
+                        <button onclick="clearLocalArticles()" class="compact-action-btn danger-action" title="清空本地测试文章，不影响URL、任务调度和RAGFlow">
+                            <i class="fa fa-trash"></i><span>清空本地</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="selectedKeywordSummary" class="keyword-selected-bar"></div>
+            <div class="article-view-toolbar">
+                <span class="text-xs text-gray-500 font-medium">显示方式</span>
+                <div class="view-toggle" role="group" aria-label="文章显示方式">
+                    <button id="cardViewBtn" type="button" class="view-toggle-btn active" onclick="setArticleViewMode('card')" title="卡片视图" aria-label="卡片视图">
+                        <i class="fa fa-th-large"></i>
+                    </button>
+                    <button id="listViewBtn" type="button" class="view-toggle-btn" onclick="setArticleViewMode('list')" title="列表视图" aria-label="列表视图">
+                        <i class="fa fa-list"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="articlesContainer" class="divide-y divide-gray-200">
+                <!-- 文章列表将通过JavaScript加载 -->
+            </div>
+            <div class="mt-2 border-t border-gray-200 pt-2">
+                <div id="pagination" class="flex justify-center gap-1">
+                    <!-- 分页将通过JavaScript生成 -->
+                </div>
+            </div>
+        </div>
+        </section>
+    </main>
+
+    <script>
+        let currentPage = 1;
+        const perPage = 10;
+        let selectedKeyword = '';
+        let selectedKeywordCount = 0;
+        let keywordMapData = [];
+        let articleViewMode = 'card';
+        let lastArticles = [];
+        
+        // 统一的时间格式化函数 - 将UTC时间转换为中国时间(UTC+8)
+        function formatDateTimeLocal(dateStr) {
+            if (!dateStr) return '-';
+            const str = String(dateStr).replace('T', ' ').substring(0, 19);
+            // 服务器存储的是UTC时间，需要加8小时转换为中国时间
+            try {
+                // 解析时间字符串
+                const parts = str.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+                if (!parts) return str;
+                
+                // 创建UTC时间
+                const utcDate = new Date(Date.UTC(
+                    parseInt(parts[1]), parseInt(parts[2]) - 1, parseInt(parts[3]),
+                    parseInt(parts[4]), parseInt(parts[5]), parseInt(parts[6])
+                ));
+                
+                // 加8小时转换为中国时间
+                const chinaDate = new Date(utcDate.getTime() + 8 * 60 * 60 * 1000);
+                
+                const year = chinaDate.getUTCFullYear();
+                const month = String(chinaDate.getUTCMonth() + 1).padStart(2, '0');
+                const day = String(chinaDate.getUTCDate()).padStart(2, '0');
+                const hours = String(chinaDate.getUTCHours()).padStart(2, '0');
+                const minutes = String(chinaDate.getUTCMinutes()).padStart(2, '0');
+                const seconds = String(chinaDate.getUTCSeconds()).padStart(2, '0');
+                return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+            } catch (e) {
+                return str;
+            }
+        }
+
+        // 移动端菜单切换
+        document.addEventListener('DOMContentLoaded', function() {
+            const menuBtn = document.getElementById('menuBtn');
+            const mobileMenu = document.getElementById('mobileMenu');
+            
+            if (menuBtn && mobileMenu) {
+                menuBtn.addEventListener('click', function() {
+                    mobileMenu.classList.toggle('hidden');
+                });
+            }
+        });
+
+        // 防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // 页面加载时初始化
+        window.onload = function() {
+            console.log('📄 聚合结果页面加载，初始化数据...');
+            refreshAllData();
+            
+            // 绑定搜索事件 - 实时搜索（防抖300ms）
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', debounce(function() {
+                    if (selectedKeyword) {
+                        console.log('🔍 搜索内容变化，重新加载文章...');
+                        loadArticles(1);
+                    } else {
+                        displayKeywordMap(keywordMapData);
+                    }
+                }, 300));
+                
+                // 保留回车键搜索
+                searchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        if (selectedKeyword) {
+                            loadArticles(1);
+                        } else {
+                            displayKeywordMap(keywordMapData);
+                        }
+                    }
+                });
+            }
+            
+            // 绑定域名筛选事件
+            const domainFilter = document.getElementById('domainFilter');
+            if (domainFilter) {
+                domainFilter.addEventListener('change', function() {
+                    if (selectedKeyword) {
+                        console.log('🌐 域名筛选变化，重新加载文章...');
+                        loadArticles(1);
+                    }
+                });
+            }
+            
+            // 绑定分类筛选事件
+            const categoryFilter = document.getElementById('categoryFilter');
+            if (categoryFilter) {
+                categoryFilter.addEventListener('change', function() {
+                    if (selectedKeyword) {
+                        console.log('📁 分类筛选变化，重新加载文章...');
+                        loadArticles(1);
+                    }
+                });
+            }
+            
+            // 绑定来源URL筛选事件
+            const sourceUrlFilter = document.getElementById('sourceUrlFilter');
+            if (sourceUrlFilter) {
+                sourceUrlFilter.addEventListener('change', function() {
+                    if (selectedKeyword) {
+                        console.log('📍 来源筛选变化，重新加载文章...');
+                        loadArticles(1);
+                    }
+                });
+            }
+            
+            // 加载分类列表
+            loadCategories();
+            // 加载来源URL列表
+            loadSourceUrls();
+        };
+
+        // 页面获得焦点时刷新数据
+        window.addEventListener('focus', function() {
+            console.log('🔄 页面获得焦点，刷新数据...');
+            refreshAllData();
+        });
+
+        // 页面可见性变化时刷新
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                console.log('🔄 页面变为可见，刷新数据...');
+                refreshAllData();
+            }
+        });
+
+        // 刷新所有数据的统一方法
+        function refreshAllData() {
+            loadStatistics();
+            loadDomains(); 
+            loadKeywordMap();
+            if (selectedKeyword) {
+                loadArticles(1);
+            } else {
+                showKeywordPrompt();
+            }
+        }
+
+        // 加载统计信息
+        function loadStatistics() {
+            fetch('/article-management/api/statistics')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const stats = data.stats;
+                        document.getElementById('totalArticles').textContent = stats.total_articles || 0;
+                        document.getElementById('totalDomains').textContent = stats.domains || 0;
+                        document.getElementById('lastCrawl').textContent = stats.last_crawl_time ? 
+                            formatDateTimeLocal(stats.last_crawl_time) : '-';
+                        document.getElementById('todayNew').textContent = stats.today_new_articles || 0;
+                    }
+                })
+                .catch(error => console.error('加载统计信息失败:', error));
+        }
+
+        // 加载分类列表
+        function loadCategories() {
+            fetch('/api/categories?is_active=true')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const select = document.getElementById('categoryFilter');
+                        // 清空除了第一个选项之外的所有选项
+                        while (select.options.length > 1) {
+                            select.remove(1);
+                        }
+                        // 添加分类选项
+                        data.categories.forEach(cat => {
+                            const option = document.createElement('option');
+                            option.value = cat.id;
+                            option.textContent = cat.name;
+                            select.appendChild(option);
+                        });
+                    }
+                })
+                .catch(error => console.error('加载分类列表失败:', error));
+        }
+        
+        // 加载来源URL列表（主URL）
+        function loadSourceUrls() {
+            fetch('/api/url-management/urls?per_page=1000&parent_url_id=0')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const select = document.getElementById('sourceUrlFilter');
+                        // 清空除了第一个选项之外的所有选项
+                        while (select.options.length > 1) {
+                            select.remove(1);
+                        }
+                        // 添加来源URL选项
+                        data.urls.forEach(url => {
+                            const option = document.createElement('option');
+                            option.value = url.id;
+                            option.textContent = url.name || url.url;
+                            select.appendChild(option);
+                        });
+                    }
+                })
+                .catch(error => console.error('加载来源URL列表失败:', error));
+        }
+        
+        // 加载域名列表
+        function loadDomains() {
+            fetch('/article-management/api/domains')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const select = document.getElementById('domainFilter');
+                        // 清空除了第一个"所有域名"选项之外的所有选项
+                        while (select.options.length > 1) {
+                            select.remove(1);
+                        }
+                        // 添加新的域名选项
+                        data.domains.forEach(item => {
+                            const option = document.createElement('option');
+                            option.value = item.domain;
+                            option.textContent = `${item.domain} (${item.count})`;
+                            select.appendChild(option);
+                        });
+                    }
+                })
+                .catch(error => console.error('加载域名列表失败:', error));
+        }
+
+        function loadKeywordMap() {
+            const container = document.getElementById('keywordMapContainer');
+            if (!container) return;
+            container.innerHTML = `<div class="col-span-full p-6 text-center text-gray-500">
+                <i class="fa fa-spinner fa-spin text-2xl text-blue-500 mb-2 block"></i>
+                <p class="text-xs">正在加载关键词图谱...</p>
+            </div>`;
+
+            fetch('/article-management/api/keyword-map?limit=500')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        keywordMapData = data.keywords || [];
+                        displayKeywordMap(keywordMapData);
+                    } else {
+                        throw new Error(data.error || '加载失败');
+                    }
+                })
+                .catch(error => {
+                    console.error('加载关键词图谱失败:', error);
+                    container.innerHTML = `<div class="col-span-full p-6 text-center text-red-500">
+                        <i class="fa fa-exclamation-triangle text-2xl mb-2 block"></i>
+                        <p class="text-xs">关键词图谱加载失败：${escapeHtml(error.message)}</p>
+                    </div>`;
+                });
+        }
+
+        function displayKeywordMap(keywords) {
+            const container = document.getElementById('keywordMapContainer');
+            if (!container) return;
+            const searchInput = document.getElementById('searchInput');
+            const filterText = (searchInput ? searchInput.value : '').trim().toLowerCase();
+            const visibleKeywords = (keywords || []).filter(item => {
+                if (!filterText || selectedKeyword) return true;
+                return String(item.keyword || '').toLowerCase().includes(filterText);
+            });
+
+            if (visibleKeywords.length === 0) {
+                container.innerHTML = `<div class="col-span-full p-6 text-center text-gray-500">
+                    <i class="fa fa-project-diagram text-3xl text-gray-300 mb-2 block"></i>
+                    <p class="text-xs">暂无关键词数据</p>
+                </div>`;
+                return;
+            }
+
+            const maxCount = Math.max(...visibleKeywords.map(item => item.article_count || 0), 1);
+            container.innerHTML = visibleKeywords.map(item => {
+                const count = item.article_count || 0;
+                const scale = Math.sqrt(Math.max(count, 1) / maxCount);
+                const bubbleSize = 84 + Math.round(scale * 72);
+                const countSize = 16 + Math.round(scale * 12);
+                const labelSize = bubbleSize < 108 ? 12 : 14;
+                const activeClass = selectedKeyword === item.keyword ? ' active' : '';
+                const encodedKeyword = encodeURIComponent(item.keyword || '');
+                return `<button type="button" class="keyword-node${activeClass}" style="--bubble-size: ${bubbleSize}px; --node-count-size: ${countSize}px; --bubble-label-size: ${labelSize}px" onclick="selectKeyword(decodeURIComponent('${encodedKeyword}'), ${count})" title="${escapeHtml(item.keyword)} · ${count}篇文章">
+                    <span class="keyword-node-name">${escapeHtml(item.keyword)}</span>
+                    <span class="keyword-node-count"><strong>${count}</strong><span>篇</span></span>
+                    <div class="keyword-node-meta">${item.task_count || 0} 个任务</div>
+                </button>`;
+            }).join('');
+        }
+
+        function selectKeyword(keyword, count) {
+            selectedKeyword = keyword || '';
+            selectedKeywordCount = count || 0;
+            currentPage = 1;
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) searchInput.value = '';
+            displayKeywordMap(keywordMapData);
+            updateKeywordSelection();
+            loadArticles(1);
+        }
+
+        function clearKeywordSelection() {
+            selectedKeyword = '';
+            selectedKeywordCount = 0;
+            currentPage = 1;
+            displayKeywordMap(keywordMapData);
+            updateKeywordSelection();
+            showKeywordPrompt();
+        }
+
+        function updateKeywordSelection(total) {
+            const summary = document.getElementById('selectedKeywordSummary');
+            const clearBtn = document.getElementById('clearKeywordBtn');
+            if (!summary || !clearBtn) return;
+
+            if (!selectedKeyword) {
+                summary.classList.remove('active');
+                summary.innerHTML = '';
+                clearBtn.classList.add('hidden');
+                return;
+            }
+
+            clearBtn.classList.remove('hidden');
+            const shownTotal = typeof total === 'number' ? total : selectedKeywordCount;
+            summary.classList.add('active');
+            summary.innerHTML = `<div class="min-w-0">
+                <i class="fa fa-filter mr-1"></i>
+                当前关键词：<span class="font-bold">${escapeHtml(selectedKeyword)}</span>
+                <span class="text-blue-700 ml-2">${shownTotal || 0} 篇文章</span>
+            </div>
+            <button type="button" onclick="clearKeywordSelection()" class="text-blue-700 hover:text-blue-900 text-xs font-bold">
+                清除筛选
+            </button>`;
+        }
+
+        function showKeywordPrompt() {
+            const container = document.getElementById('articlesContainer');
+            const pagination = document.getElementById('pagination');
+            if (pagination) pagination.innerHTML = '';
+            if (container) {
+                container.className = '';
+                container.innerHTML = `<div class="p-8 text-center text-gray-500">
+                    <i class="fa fa-sitemap text-3xl text-gray-300 mb-2 block"></i>
+                    <p class="text-sm font-semibold text-gray-700">请选择上方关键词节点</p>
+                    <p class="text-xs text-gray-500 mt-1">点击关键词后将加载该关键词对应的聚合文章</p>
+                </div>`;
+            }
+            updateKeywordSelection();
+        }
+
+        // 加载文章列表
+        function loadArticles(page = 1) {
+            if (!selectedKeyword) {
+                showKeywordPrompt();
+                return;
+            }
+            const domain = document.getElementById('domainFilter').value;
+            const category = document.getElementById('categoryFilter').value;
+            const sourceUrl = document.getElementById('sourceUrlFilter').value;
+            const search = document.getElementById('searchInput').value;
+            
+            let url = `/article-management/api/articles?page=${page}&per_page=${perPage}`;
+            url += `&keyword=${encodeURIComponent(selectedKeyword)}`;
+            if (domain) url += `&domain=${encodeURIComponent(domain)}`;
+            if (category) url += `&category_id=${encodeURIComponent(category)}`;
+            if (sourceUrl) url += `&source_url_id=${encodeURIComponent(sourceUrl)}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        currentPage = data.page;
+                        displayArticles(data.articles);
+                        displayPagination(data.page, data.total_pages);
+                        updateKeywordSelection(data.total);
+                    }
+                })
+                .catch(error => console.error('加载文章失败:', error));
+        }
+
+        // OpenCC转换器（简繁互转）
+        let converterS2T = null;
+        let converterT2S = null;
+        try {
+            converterS2T = OpenCC.Converter({ from: 'cn', to: 'tw' });
+            converterT2S = OpenCC.Converter({ from: 'tw', to: 'cn' });
+        } catch (e) {
+            console.warn('OpenCC加载失败，简繁转换不可用');
+        }
+        
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function splitKeywordValue(value) {
+            return String(value || '')
+                .split(/[,，;；、\s]+/)
+                .map(k => k.trim())
+                .filter(Boolean);
+        }
+
+        function addParsedKeyword(map, keyword, location) {
+            const clean = String(keyword || '').trim();
+            if (!clean) return;
+            const existing = map.get(clean) || { keyword: clean, locations: new Set() };
+            existing.locations.add(location || 'unknown');
+            map.set(clean, existing);
+        }
+
+        function parseMatchedKeywords(keywords) {
+            const parsed = new Map();
+            if (!keywords) return [];
+
+            if (Array.isArray(keywords)) {
+                keywords.forEach(item => addParsedKeyword(parsed, item, 'unknown'));
+                return Array.from(parsed.values());
+            }
+
+            if (typeof keywords === 'object') {
+                (keywords.title_keywords || []).forEach(item => addParsedKeyword(parsed, item, 'title'));
+                (keywords.content_keywords || []).forEach(item => addParsedKeyword(parsed, item, 'content'));
+                (keywords.all_keywords || []).forEach(item => addParsedKeyword(parsed, item, 'unknown'));
+                return Array.from(parsed.values());
+            }
+
+            const raw = String(keywords).trim();
+            if (!raw) return [];
+
+            if (raw.startsWith('{') || raw.startsWith('[')) {
+                try {
+                    return parseMatchedKeywords(JSON.parse(raw));
+                } catch (e) { }
+            }
+
+            const locationPattern = /(标题|標題|title|内容|內容|正文|content)\s*[\(:：]\s*([^）)]+)/ig;
+            let structuredMatch;
+            while ((structuredMatch = locationPattern.exec(raw)) !== null) {
+                const label = structuredMatch[1].toLowerCase();
+                const location = /title|标题|標題/.test(label) ? 'title' : 'content';
+                splitKeywordValue(structuredMatch[2]).forEach(item => addParsedKeyword(parsed, item, location));
+            }
+
+            raw.split(/[,，;；]+/).map(k => k.trim()).filter(Boolean).forEach(token => {
+                if (token.startsWith('[标]') || token.startsWith('[標]')) {
+                    addParsedKeyword(parsed, token.substring(3), 'title');
+                } else if (token.startsWith('[文]')) {
+                    addParsedKeyword(parsed, token.substring(3), 'content');
+                } else if (parsed.size === 0) {
+                    addParsedKeyword(parsed, token, 'unknown');
+                }
+            });
+
+            return Array.from(parsed.values());
+        }
+
+        function getMatchedKeywordTexts(keywords) {
+            return [...new Set(parseMatchedKeywords(keywords).map(item => item.keyword).filter(Boolean))]
+                .sort((a, b) => b.length - a.length);
+        }
+
+        // 高亮关键词函数 - 使用OpenCC支持简繁体匹配
+        function highlightKeywords(text, keywords) {
+            if (!keywords || !text) return text;
+            
+            const keywordList = getMatchedKeywordTexts(keywords);
+            if (keywordList.length === 0) return text;
+            
+            let result = text;
+            keywordList.forEach(keyword => {
+                // 生成简体和繁体版本
+                const patterns = [keyword];
+                if (converterS2T) {
+                    const traditional = converterS2T(keyword);
+                    if (traditional !== keyword) patterns.push(traditional);
+                }
+                if (converterT2S) {
+                    const simplified = converterT2S(keyword);
+                    if (simplified !== keyword && !patterns.includes(simplified)) patterns.push(simplified);
+                }
+                
+                // 匹配所有版本
+                patterns.forEach(pattern => {
+                    try {
+                        const regex = new RegExp('(' + pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+                        result = result.replace(regex, '<mark class="bg-yellow-300 text-yellow-900 px-0.5 rounded">$1</mark>');
+                    } catch (e) { }
+                });
+            });
+            
+            return result;
+        }
+        
+        // 渲染关键词标签 - 区分标题[标]和内容[文]匹配
+        function renderKeywordTags(keywords, options = {}) {
+            const parsed = parseMatchedKeywords(keywords);
+            if (parsed.length === 0) return '';
+
+            const badges = [];
+            const titleKeywords = [];
+            const contentKeywords = [];
+            const unknownKeywords = [];
+
+            parsed.forEach(item => {
+                const locations = item.locations || new Set(['unknown']);
+                if (locations.has('title')) {
+                    titleKeywords.push(item.keyword);
+                }
+                if (locations.has('content')) {
+                    contentKeywords.push(item.keyword);
+                }
+                if (!locations.has('title') && !locations.has('content')) {
+                    unknownKeywords.push(item.keyword);
+                }
+            });
+
+            if (titleKeywords.length) {
+                badges.push(`<span class="keyword-badge keyword-badge-title" title="文章标题匹配">
+                    <i class="fa fa-heading"></i><span>标题：${titleKeywords.map(escapeHtml).join('、')}</span>
+                </span>`);
+            }
+            if (contentKeywords.length) {
+                const contentLabel = options.hideContentLabel ? '' : 'Content: ';
+                badges.push(`<span class="keyword-badge keyword-badge-content" title="文章正文匹配">
+                    <i class="fa fa-file-text"></i><span>${contentLabel}${contentKeywords.map(escapeHtml).join('、')}</span>
+                </span>`);
+            }
+            if (unknownKeywords.length) {
+                badges.push(`<span class="keyword-badge keyword-badge-unknown" title="历史数据未记录匹配位置">
+                    <i class="fa fa-tag"></i><span>${unknownKeywords.map(escapeHtml).join('、')}</span>
+                </span>`);
+            }
+
+            return `<span class="keyword-badges">${badges.join('')}</span>`;
+        }
+
+        function getScheduleIdFromTaskId(taskId) {
+            const match = String(taskId || '').match(/^schedule_(\d+)_/);
+            return match ? match[1] : '';
+        }
+
+        function taskDetailUrl(article) {
+            const taskId = article.latest_task_id || '';
+            if (!taskId) return '';
+            const scheduleId = article.latest_schedule_id || getScheduleIdFromTaskId(taskId);
+            if (scheduleId) {
+                return `/schedule-management?edit_schedule_id=${encodeURIComponent(scheduleId)}`;
+            }
+            return `/api/app/task/${encodeURIComponent(taskId)}`;
+        }
+
+        function isPlaceholderTaskLabel(value) {
+            const normalized = String(value || '').trim().toLowerCase();
+            const compact = normalized.replace(/\s+/g, '');
+            return normalized === 'source task' || compact === 'sourcetask' || normalized === '来源任务';
+        }
+
+        function renderTaskOrigin(article) {
+            const taskId = article.latest_task_id || '';
+            const siteName = article.source_url_name || '';
+            if (!taskId) {
+                if (siteName) {
+                    return `<span class="task-origin-empty" title="${escapeHtml(siteName)}">
+                        <i class="fa fa-globe text-gray-400 text-xs"></i><span>${escapeHtml(siteName)}</span>
+                    </span>`;
+                }
+                return `<span class="task-origin-empty" title="无任务关联">
+                    <i class="fa fa-tasks text-gray-300 text-xs"></i><span>无任务</span>
+                </span>`;
+            }
+            const candidates = [
+                article.latest_task_display_name,
+                article.source_task_name,
+                article.latest_task_name,
+                taskId
+            ].filter(value => value && !isPlaceholderTaskLabel(value));
+            const label = candidates[0] || taskId;
+            // 若有中文站点名，显示"站点名 · 任务名"，tooltip 保留原始 taskId
+            const displayLabel = siteName ? `${siteName} · ${label}` : label;
+            const titleLabel = siteName ? `${siteName} · ${label} · ${taskId}` : `${label} · ${taskId}`;
+            const url = taskDetailUrl(article);
+            return `<a href="${url}" class="task-origin-link" title="${escapeHtml(titleLabel)}">
+                <i class="fa fa-tasks text-xs"></i><span class="truncate">${escapeHtml(displayLabel)}</span>
+            </a>`;
+        }
+
+        function buildArticleViewModel(article) {
+            const fullTime = formatDateTimeLocal(article.last_crawled);
+            const lastCrawled = fullTime !== '-' ? fullTime.substring(5, 16).replace(' ', ' ') : '-';
+            const shortDomain = article.domain ? article.domain.replace(/^https?:\/\/(www\.)?/, '').split('/')[0] : '-';
+            const rawTitle = article.title || '无标题';
+            const highlightedTitle = highlightKeywords(escapeHtml(rawTitle), article.matched_keywords);
+            const rawContent = String(article.content || '').replace(/\s+/g, ' ').trim();
+            const preview = rawContent || '暂无内容预览';
+            const highlightedPreview = highlightKeywords(escapeHtml(preview), article.matched_keywords);
+            return {
+                id: article.id,
+                rawTitle,
+                highlightedTitle,
+                highlightedPreview,
+                shortDomain,
+                lastCrawled,
+                keywordTags: renderKeywordTags(article.matched_keywords, articleViewMode === 'card' ? { hideContentLabel: true } : {}),
+                publishDate: article.publish_date || '未知',
+                contentLength: article.content_length || 0,
+                taskOrigin: renderTaskOrigin(article)
+            };
+        }
+
+        function setArticleViewMode(mode) {
+            articleViewMode = mode === 'list' ? 'list' : 'card';
+            document.getElementById('cardViewBtn')?.classList.toggle('active', articleViewMode === 'card');
+            document.getElementById('listViewBtn')?.classList.toggle('active', articleViewMode === 'list');
+            displayArticles(lastArticles);
+        }
+
+        function handleArticleCardClick(event, articleId) {
+            if (event.target.closest('button, a, input, select, textarea')) return;
+            viewArticle(articleId);
+        }
+
+        // 显示文章列表
+        function displayArticles(articles) {
+            const container = document.getElementById('articlesContainer');
+            lastArticles = articles || [];
+
+            if (lastArticles.length === 0) {
+                container.className = '';
+                container.innerHTML = '<div class="p-6 text-center text-gray-500"><i class="fa fa-inbox text-3xl text-gray-300 mb-2 block"></i><p class="text-xs">暂无文章</p></div>';
+                return;
+            }
+
+            const startNumber = (currentPage - 1) * perPage;
+            if (articleViewMode === 'card') {
+                container.className = 'article-card-grid';
+                container.innerHTML = lastArticles.map((article, index) => {
+                    const model = buildArticleViewModel(article);
+                    return `<article class="article-card" onclick="handleArticleCardClick(event, ${model.id})">
+                        <button type="button" onclick="viewArticle(${model.id})" class="article-card-title" title="${escapeHtml(model.rawTitle)}">${model.highlightedTitle}</button>
+                        <div class="article-card-meta">
+                            <span title="${escapeHtml(article.domain || '-')}"><i class="fa fa-link text-gray-400"></i> ${escapeHtml(model.shortDomain)}</span>
+                            <span><i class="fa fa-calendar text-gray-400"></i> ${escapeHtml(model.publishDate)}</span>
+                            <span><i class="fa fa-font text-gray-400"></i> ${model.contentLength}字</span>
+                        </div>
+                        <div class="article-card-preview">${model.highlightedPreview}</div>
+                        <div class="min-h-[22px] overflow-hidden">${model.keywordTags || '<span class="keyword-empty">无关键词</span>'}</div>
+                        <div class="article-card-footer">
+                            <div class="min-w-0">${model.taskOrigin}</div>
+                            <div class="flex gap-1 flex-shrink-0">
+                                <button onclick="viewArticle(${model.id})" class="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors" title="查看文章">
+                                    <i class="fa fa-eye"></i>
+                                </button>
+                                <button onclick="fixSingleArticle(${model.id})" class="px-2 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 transition-colors" title="修复内容">
+                                    <i class="fa fa-wrench"></i>
+                                </button>
+                                <button onclick="deleteArticle(${model.id})" class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors" title="删除文章">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </article>`;
+                }).join('');
+                return;
+            }
+
+            container.className = 'divide-y divide-gray-200';
+            const rows = lastArticles.map((article, index) => {
+                const model = buildArticleViewModel(article);
+                return `
+                <div class="p-2 hover:bg-gray-50 transition-colors">
+                    <div class="article-list-row">
+                        <div class="article-row-number">${startNumber + index + 1}</div>
+                        <div class="flex-1 min-w-0 overflow-hidden">
+                            <div class="flex items-center gap-2 mb-1">
+                                <button type="button" onclick="viewArticle(${model.id})" class="text-sm font-medium text-gray-800 truncate flex-shrink text-left hover:text-blue-700 hover:underline" title="${escapeHtml(model.rawTitle)}" style="max-width: 70%;">${model.highlightedTitle}</button>
+                                ${model.keywordTags ? `<div class="flex flex-wrap gap-1 flex-shrink-0">${model.keywordTags}</div>` : ''}
+                            </div>
+                            <div class="flex items-center gap-1 text-xs text-gray-500">
+                                <span class="flex items-center gap-0.5 truncate max-w-[100px]" title="${escapeHtml(article.domain || '-')}">
+                                    <i class="fa fa-link text-gray-400 text-xs"></i>
+                                    <span class="truncate">${escapeHtml(model.shortDomain)}</span>
+                                </span>
+                                <span class="text-gray-300">·</span>
+                                <span class="flex items-center gap-0.5 whitespace-nowrap">
+                                    <i class="fa fa-calendar text-gray-400 text-xs"></i>${escapeHtml(model.publishDate)}
+                                </span>
+                                <span class="text-gray-300">·</span>
+                                <span class="flex items-center gap-0.5 whitespace-nowrap">
+                                    <i class="fa fa-clock text-gray-400 text-xs"></i>${model.lastCrawled}
+                                </span>
+                                <span class="text-gray-300">·</span>
+                                <span class="flex items-center gap-0.5 whitespace-nowrap">
+                                    <i class="fa fa-font text-gray-400 text-xs"></i>${model.contentLength}字
+                                </span>
+                            </div>
+                        </div>
+                        <div class="min-w-0">
+                            ${model.taskOrigin}
+                        </div>
+                        <div class="flex gap-1 flex-shrink-0 justify-end">
+                            <button onclick="viewArticle(${model.id})" class="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors" title="查看文章">
+                                <i class="fa fa-eye"></i>
+                            </button>
+                            <button onclick="fixSingleArticle(${model.id})" class="px-2 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 transition-colors" title="修复内容">
+                                <i class="fa fa-wrench"></i>
+                            </button>
+                            <button onclick="deleteArticle(${model.id})" class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors" title="删除文章">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            container.innerHTML = `
+                <div class="article-list-header">
+                    <div>#</div>
+                    <div>文章</div>
+                    <div>聚合任务</div>
+                    <div class="text-right">操作</div>
+                </div>
+                ${rows}
+            `;
+        }
+
+        // 显示分页
+        function displayPagination(current, total) {
+            const pagination = document.getElementById('pagination');
+            
+            if (total <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            
+            // 上一页
+            html += `<button onclick="loadArticles(${current - 1})" 
+                     class="px-2 py-0.5 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors ${current <= 1 ? 'opacity-50 cursor-not-allowed' : ''}" 
+                     ${current <= 1 ? 'disabled' : ''}>
+                <i class="fa fa-chevron-left mr-0.5"></i>上一页
+            </button>`;
+            
+            // 页码
+            for (let i = Math.max(1, current - 2); i <= Math.min(total, current + 2); i++) {
+                if (i === current) {
+                    html += `<button class="px-2 py-0.5 bg-primary text-white border border-primary rounded text-xs font-medium">${i}</button>`;
+                } else {
+                    html += `<button onclick="loadArticles(${i})" class="px-2 py-0.5 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">${i}</button>`;
+                }
+            }
+            
+            // 下一页
+            html += `<button onclick="loadArticles(${current + 1})" 
+                     class="px-2 py-0.5 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors ${current >= total ? 'opacity-50 cursor-not-allowed' : ''}" 
+                     ${current >= total ? 'disabled' : ''}>
+                下一页<i class="fa fa-chevron-right ml-0.5"></i>
+            </button>`;
+            
+            pagination.innerHTML = html;
+        }
+
+        // 查看文章（改进版 - 使用漂亮的模态框）
+        function viewArticle(id) {
+            // 显示模态框
+            const modal = document.getElementById('articleModal');
+            modal.classList.add('active');
+            
+            // 显示加载状态
+            document.getElementById('modalTitle').textContent = '加载中...';
+            document.getElementById('modalContent').textContent = '正在加载文章内容...';
+            
+            // 加载文章数据
+            fetch(`/article-management/api/article/${id}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const article = data.article;
+                        
+                        // 填充元信息 - 标题高亮关键词
+                        const titleText = article.title || '无标题';
+                        document.getElementById('modalTitle').innerHTML = highlightKeywords(escapeHtml(titleText), article.matched_keywords);
+                        
+                        document.getElementById('modalUrl').href = article.url || '#';
+                        document.getElementById('modalUrl').textContent = article.url || '-';
+                        document.getElementById('modalDate').textContent = article.publish_date || '未知';
+                        document.getElementById('modalSiteName').textContent = article.source_url_name || '-';
+                        document.getElementById('modalDomain').textContent = article.domain || '-';
+                        document.getElementById('modalCrawlTime').textContent = article.last_crawled ? 
+                            formatDateTimeLocal(article.last_crawled) : '-';
+                        
+                        // 填充匹配关键词
+                        const keywordsContainer = document.getElementById('modalKeywords');
+                        keywordsContainer.innerHTML = renderKeywordTags(article.matched_keywords) || '<span class="keyword-empty">无</span>';
+                        
+                        // 填充内容 - 正文高亮关键词
+                        const content = article.content || '暂无内容';
+                        // 先转义HTML，再高亮关键词
+                        const escapedContent = escapeHtml(content);
+                        document.getElementById('modalContent').innerHTML = highlightKeywords(escapedContent, article.matched_keywords);
+                        document.getElementById('modalContentLength').textContent = `${content.length} 字符`;
+                    } else {
+                        alert('加载文章失败：' + (data.message || '未知错误'));
+                        closeArticleModal();
+                    }
+                })
+                .catch(error => {
+                    console.error('加载文章失败:', error);
+                    alert('加载文章失败，请重试');
+                    closeArticleModal();
+                });
+        }
+        
+        // 关闭模态框
+        function closeArticleModal() {
+            document.getElementById('articleModal').classList.remove('active');
+        }
+        
+        
+        // 点击模态框背景关闭
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('articleModal');
+            if (e.target === modal) {
+                closeArticleModal();
+            }
+        });
+        
+        // ESC键关闭模态框
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeArticleModal();
+            }
+        });
+
+        // 删除文章
+        function deleteArticle(id) {
+            if (!confirm('确定要删除这篇文章吗？')) return;
+            
+            fetch(`/article-management/api/article/${id}`, { method: 'DELETE' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('删除成功');
+                        loadArticles(currentPage);
+                        loadStatistics();
+                    } else {
+                        alert('删除失败: ' + data.error);
+                    }
+                })
+                .catch(error => console.error('删除失败:', error));
+        }
+
+        // 清空本地文章（仅清空本地 articles / article_tasks，不影响URL、定时任务和RAGFlow）
+        function clearLocalArticles() {
+            if (!confirm('确定要清空本地文章吗？这会删除本地已保存的所有文章，方便重新测试爬取。')) return;
+            const confirmText = prompt('请输入 DELETE 确认清空本地文章：');
+            if (confirmText !== 'DELETE') {
+                alert('已取消清空。');
+                return;
+            }
+
+            fetch('/article-management/api/articles/clear-local', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ confirm: 'DELETE_LOCAL_ARTICLES' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const result = data.result || {};
+                    alert(`清空完成：删除本地文章 ${result.deleted_articles || 0} 篇，关联记录 ${result.deleted_article_tasks || 0} 条。`);
+                    currentPage = 1;
+                    refreshAllData();
+                    loadCategories();
+                    loadSourceUrls();
+                } else {
+                    alert('清空失败: ' + (data.error || '未知错误'));
+                }
+            })
+            .catch(error => {
+                console.error('清空本地文章失败:', error);
+                alert('清空失败，请查看控制台或后端日志。');
+            });
+        }
+
+        // 刷新文章和统计信息
+        function refreshArticles() {
+            console.log('🔄 手动刷新文章数据...');
+            refreshAllData();
+        }
+        
+        // 导出文章（支持当前筛选条件）
+        function exportArticles() {
+            const domain = document.getElementById('domainFilter').value;
+            const category = document.getElementById('categoryFilter').value;
+            const sourceUrl = document.getElementById('sourceUrlFilter').value;
+            const search = document.getElementById('searchInput').value;
+            
+            // 构建导出URL
+            let url = `/article-management/api/export?format=zip`;
+            if (selectedKeyword) url += `&keyword=${encodeURIComponent(selectedKeyword)}`;
+            if (domain) url += `&domain=${encodeURIComponent(domain)}`;
+            if (category) url += `&category_id=${encodeURIComponent(category)}`;
+            if (sourceUrl) url += `&source_url_id=${encodeURIComponent(sourceUrl)}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+            
+            // 触发下载
+            window.location.href = url;
+            console.log('📥 开始导出文章...');
+        }
+        
+        // 诊断文章质量
+        function diagnoseArticles() {
+            if (!confirm('确定要诊断所有文章的内容质量吗？这可能需要几分钟时间。')) return;
+            
+            const loadingMsg = '正在诊断文章质量，请稍候...';
+            alert(loadingMsg);
+            
+            fetch('/article-management/api/diagnose', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ limit: 1000 })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const result = data.result;
+                    let message = `📊 诊断完成！\n\n`;
+                    message += `总文章数: ${result.total}\n`;
+                    message += `✅ 良好: ${result.good} (${(result.good/result.total*100).toFixed(1)}%)\n`;
+                    message += `❌ 有问题: ${result.bad} (${(result.bad/result.total*100).toFixed(1)}%)\n\n`;
+                    
+                    if (result.issues_summary && Object.keys(result.issues_summary).length > 0) {
+                        message += `🐛 主要问题:\n`;
+                        Object.entries(result.issues_summary).slice(0, 5).forEach(([issue, count]) => {
+                            message += `  • ${issue}: ${count}篇\n`;
+                        });
+                    }
+                    
+                    if (result.bad > 0) {
+                        message += `\n💡 发现 ${result.bad} 篇文章需要修复。\n建议点击"批量修复"按钮进行修复。`;
+                    }
+                    
+                    alert(message);
+                } else {
+                    alert('诊断失败: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('诊断失败:', error);
+                alert('诊断失败: ' + error.message);
+            });
+        }
+        
+        // 修复单篇文章
+        function fixSingleArticle(articleId) {
+            if (!confirm('确定要重新提取这篇文章的内容吗？')) return;
+            
+            const btn = event.target.closest('button');
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+            
+            fetch('/article-management/api/fix-article', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ article_id: articleId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+                
+                if (data.success) {
+                    let message = '✅ 修复成功！\n\n';
+                    message += `质量分数提升: ${data.old_quality} → ${data.new_quality}\n`;
+                    message += `问题数量: ${data.old_issues} → ${data.new_issues}`;
+                    alert(message);
+                    loadArticles(currentPage);
+                } else {
+                    alert('修复失败: ' + data.error);
+                }
+            })
+            .catch(error => {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+                console.error('修复失败:', error);
+                alert('修复失败: ' + error.message);
+            });
+        }
+        
+        // 批量修复文章
+        function batchFixArticles() {
+            const message = '确定要批量修复所有有问题的文章吗？\n\n这将重新提取内容质量低的文章。\n这可能需要较长时间，请耐心等待。';
+            if (!confirm(message)) return;
+            
+            alert('🔧 开始批量修复，请稍候...\n此过程可能需要几分钟时间，请勿关闭页面。');
+            
+            fetch('/article-management/api/batch-fix', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ quality_threshold: 60 })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const result = data.result;
+                    let message = `📊 批量修复完成！\n\n`;
+                    message += `总计: ${result.total}篇\n`;
+                    message += `✅ 成功: ${result.success}篇\n`;
+                    message += `⚠️ 无改进: ${result.no_improvement}篇\n`;
+                    message += `❌ 失败: ${result.failed}篇\n`;
+                    alert(message);
+                    loadArticles(currentPage);
+                    loadStatistics();
+                } else {
+                    alert('批量修复失败: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('批量修复失败:', error);
+                alert('批量修复失败: ' + error.message);
+            });
+        }
+    </script>
+    
+    <!-- 文章内容查看模态框 -->
+    <div id="articleModal" class="article-modal">
+        <div class="article-modal-content">
+            <div class="article-modal-header">
+                <h3 class="text-lg font-bold text-gray-800">
+                    <i class="fa fa-file-text mr-2"></i>文章详情
+                </h3>
+                <button onclick="closeArticleModal()" class="article-modal-close" aria-label="关闭">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="article-modal-body">
+                <!-- 文章元信息 -->
+                <div class="article-meta">
+                    <div class="article-meta-item full">
+                        <div class="article-meta-label">
+                            <i class="fa fa-heading mr-1"></i> 标题
+                        </div>
+                        <div class="article-meta-value" id="modalTitle">-</div>
+                    </div>
+                    <div class="article-meta-item full">
+                        <div class="article-meta-label">
+                            <i class="fa fa-link mr-1"></i> URL
+                        </div>
+                        <div class="article-meta-value">
+                            <a id="modalUrl" href="#" target="_blank" class="text-blue-600 hover:underline">-</a>
+                        </div>
+                    </div>
+                    <div class="article-meta-item">
+                        <div class="article-meta-label">
+                            <i class="fa fa-calendar mr-1"></i> 发布日期
+                        </div>
+                        <div class="article-meta-value" id="modalDate">-</div>
+                    </div>
+                    <div class="article-meta-item">
+                        <div class="article-meta-label">
+                            <i class="fa fa-building mr-1"></i> 网站名称
+                        </div>
+                        <div class="article-meta-value" id="modalSiteName">-</div>
+                    </div>
+                    <div class="article-meta-item">
+                        <div class="article-meta-label">
+                            <i class="fa fa-globe mr-1"></i> 来源
+                        </div>
+                        <div class="article-meta-value" id="modalDomain">-</div>
+                    </div>
+                    <div class="article-meta-item">
+                        <div class="article-meta-label">
+                            <i class="fa fa-clock mr-1"></i> 爬取时间
+                        </div>
+                        <div class="article-meta-value" id="modalCrawlTime">-</div>
+                    </div>
+                    <div class="article-meta-item full">
+                        <div class="article-meta-label">
+                            <i class="fa fa-tag mr-1"></i> 匹配关键词
+                        </div>
+                        <div class="article-meta-value" id="modalKeywords">-</div>
+                    </div>
+                </div>
+                
+                <!-- 文章内容 -->
+                <div>
+                    <h4 class="font-bold text-gray-700 mb-3 flex items-center justify-between">
+                        <span><i class="fa fa-file-lines mr-2"></i>文章正文</span>
+                        <span class="text-sm text-gray-500" id="modalContentLength">0 字符</span>
+                    </h4>
+                    <div id="modalContent" class="article-content-display bg-white border border-gray-200 rounded-lg p-4">
+                        正在加载...
+                    </div>
+                </div>
+            </div>
+            
+            <div class="article-modal-footer">
+                <button onclick="closeArticleModal()" class="btn-sm bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">
+                    <i class="fa fa-times mr-1"></i>关闭
+                </button>
+            </div>
+        </div>
+    </div>
+    
+</body>
+</html>
+
+

@@ -1,0 +1,53 @@
+services:
+  crawler:
+    image: firecrawlapp-crawler:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: firecrawl-crawler
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Shanghai
+      FLASK_HOST: 0.0.0.0
+      FLASK_PORT: 8003
+      DATABASE_PATH: /app/data/crawler_articles.db
+      CRAWL_RESULTS_DIR: /app/crawl_results
+      AUTH_STORAGE_DIR: /app/auth_storage
+      LOG_FILE: /app/crawl_logs/app.log
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "${CRAWLER_HOST_PORT:-8003}:8003"
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./crawl_results:/app/crawl_results
+      - ./auth_storage:/app/auth_storage
+      - ./crawl_logs:/app/crawl_logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/login', timeout=5).close()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    container_name: firecrawl-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redis_data:

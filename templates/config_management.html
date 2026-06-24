@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配置管理 - RAG内容聚合平台</title>
+    <link href="/static/css/tailwind.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/fontawesome.css">
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
+        .text-dark { color: #1f2937; }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -1px rgba(0,0,0,.04); }
+        .config-shell {
+            display: grid;
+            grid-template-columns: 16rem minmax(0, 1fr);
+            gap: 1.25rem;
+            align-items: start;
+        }
+        .config-nav {
+            position: sticky;
+            top: 1rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #fff;
+            padding: .5rem;
+        }
+        .config-nav-title {
+            padding: .35rem .75rem .65rem;
+            color: #6b7280;
+            font-size: .75rem;
+            font-weight: 700;
+        }
+        .nav-item {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: .625rem;
+            border-radius: 6px;
+            padding: .65rem .75rem;
+            color: #4b5563;
+            font-size: .875rem;
+            text-align: left;
+        }
+        .nav-item:hover { background: #f3f4f6; color: #1d4ed8; }
+        .nav-item.active { background: #eff6ff; color: #1d4ed8; font-weight: 700; }
+        .nav-item .nav-tag {
+            margin-left: auto;
+            color: #9ca3af;
+            font-size: .7rem;
+            font-weight: 600;
+        }
+        .config-section {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #fff;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .field-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .5rem;
+            color: #374151;
+            font-size: .875rem;
+            font-weight: 600;
+            margin-bottom: .375rem;
+        }
+        .field-input {
+            width: 100%;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: .625rem .75rem;
+            outline: none;
+            background: #fff;
+        }
+        .field-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,.16);
+        }
+        .field-hint { color: #6b7280; font-size: .75rem; line-height: 1.25rem; margin-top: .25rem; }
+        .section-subtitle {
+            color: #111827;
+            font-size: .875rem;
+            font-weight: 800;
+            padding-top: .25rem;
+        }
+        .toggle-row {
+            min-height: 2.75rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: .75rem;
+            background: #f9fafb;
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 9999px;
+            padding: .125rem .5rem;
+            font-size: .75rem;
+            white-space: nowrap;
+        }
+        .badge-warn { background: #fffbeb; color: #92400e; }
+        .badge-ok { background: #ecfdf5; color: #047857; }
+        .badge-muted { background: #f3f4f6; color: #4b5563; }
+        .status-box {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: .75rem;
+            background: #f8fafc;
+            color: #475569;
+            font-size: .875rem;
+        }
+        .status-box.ok { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+        .status-box.warn { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+        .status-box.error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+        .secret-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .5rem; }
+        @media (max-width: 1024px) {
+            .config-shell { grid-template-columns: 1fr; }
+            .config-nav {
+                position: static;
+                display: flex;
+                gap: .5rem;
+                overflow-x: auto;
+                padding: .5rem;
+                scrollbar-width: thin;
+            }
+            .config-nav-title { display: none; }
+            .nav-item {
+                width: auto;
+                min-width: 8rem;
+                flex: 0 0 auto;
+                justify-content: center;
+                white-space: nowrap;
+            }
+            .nav-item .nav-tag { display: none; }
+        }
+        @media (max-width: 640px) {
+            .config-actions { flex-direction: column-reverse; }
+            .config-actions button { width: 100%; }
+            .section-title { align-items: flex-start; flex-direction: column; }
+            .secret-row { grid-template-columns: minmax(0, 1fr) 2.75rem; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <nav class="bg-white shadow-md">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <div class="gradient-bg p-2 rounded-lg mr-3">
+                        <i class="fa fa-book text-white text-xl"></i>
+                    </div>
+                    <h1 class="text-xl font-bold text-dark">RAG内容聚合平台</h1>
+                </div>
+                <div class="hidden md:flex space-x-6 items-center">
+                    <a href="/" class="text-gray-600 hover:text-blue-600 transition-colors">控制台</a>
+                    <a href="/schedule-management" class="text-gray-600 hover:text-blue-600 transition-colors">任务调度</a>
+                    <a href="/article-management" class="text-gray-600 hover:text-blue-600 transition-colors">聚合结果</a>
+                    <details class="relative">
+                        <summary class="list-none cursor-pointer text-gray-600 hover:text-blue-600 transition-colors">系统管理 <i class="fa fa-chevron-down text-xs ml-1"></i></summary>
+                        <div class="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1">
+                            <a href="/url-management" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">URL与分类管理</a>
+                            <a href="/batch-schedule" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">批量任务</a>
+                            <a href="/schedule-execution-management" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">执行日志</a>
+                            <a href="/config-management" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">配置管理</a>
+                        </div>
+                    </details>
+                    <a href="/logout" class="text-gray-600 hover:text-red-600 transition-colors">
+                        <i class="fa fa-sign-out-alt mr-1"></i>退出登录
+                    </a>
+                </div>
+                <button id="menuBtn" class="md:hidden text-gray-600 hover:text-blue-600">
+                    <i class="fa fa-bars text-xl"></i>
+                </button>
+            </div>
+            <div id="mobileMenu" class="md:hidden hidden pb-4">
+                <a href="/" class="block py-2 text-gray-600 hover:text-blue-600">控制台</a>
+                <a href="/schedule-management" class="block py-2 text-gray-600 hover:text-blue-600">任务调度</a>
+                <a href="/article-management" class="block py-2 text-gray-600 hover:text-blue-600">聚合结果</a>
+                <details class="py-2">
+                    <summary class="list-none cursor-pointer text-gray-600 hover:text-blue-600">系统管理 <i class="fa fa-chevron-down text-xs ml-1"></i></summary>
+                    <div class="pl-4 mt-1 space-y-1">
+                        <a href="/url-management" class="block py-1 text-sm text-gray-600 hover:text-blue-600">URL与分类管理</a>
+                        <a href="/schedule-execution-management" class="block py-1 text-sm text-gray-600 hover:text-blue-600">执行日志</a>
+                        <a href="/config-management" class="block py-1 text-sm text-gray-600 hover:text-blue-600">配置管理</a>
+                    </div>
+                </details>
+                <a href="/logout" class="block py-2 text-gray-600 hover:text-red-600">
+                    <i class="fa fa-sign-out-alt mr-1"></i>退出登录
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-4 py-8">
+        <div class="mb-5 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
+            <div>
+                <h2 class="text-2xl font-bold text-dark">配置管理</h2>
+                <p id="envPath" class="mt-1 text-sm text-gray-500">正在加载配置...</p>
+            </div>
+            <div class="config-actions flex items-center gap-2">
+                <button id="reloadBtn" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium bg-white text-gray-700 hover:bg-gray-50">
+                    <i class="fa fa-refresh mr-1.5"></i>刷新
+                </button>
+                <button id="testRagflowBtn" class="px-4 py-2 border border-blue-200 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100">
+                    <i class="fa fa-plug mr-1.5"></i>测试知识库
+                </button>
+                <button id="saveBtn" class="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700">
+                    <i class="fa fa-save mr-1.5"></i>保存配置
+                </button>
+            </div>
+        </div>
+
+        <div id="messageBox" class="status-box mb-5 hidden"></div>
+
+        <div class="config-shell">
+            <aside class="config-nav card-shadow" aria-label="配置分组">
+                <div class="config-nav-title">配置分组</div>
+                <button class="nav-item active" data-target="section-ragflow"><i class="fa fa-database w-4"></i>知识库<span class="nav-tag">常用</span></button>
+                <button class="nav-item" data-target="section-proxy"><i class="fa fa-random w-4"></i>代理<span class="nav-tag">常用</span></button>
+                <button class="nav-item" data-target="section-crawl"><i class="fa fa-spider w-4"></i>爬取策略<span class="nav-tag">关键</span></button>
+                <button class="nav-item" data-target="section-scheduler"><i class="fa fa-clock-o w-4"></i>定时并发<span class="nav-tag">关键</span></button>
+                <button class="nav-item" data-target="section-system"><i class="fa fa-cog w-4"></i>系统<span class="nav-tag">高级</span></button>
+                <button class="nav-item" data-target="section-storage"><i class="fa fa-folder-open w-4"></i>存储<span class="nav-tag">高级</span></button>
+                <button class="nav-item" data-target="section-redis"><i class="fa fa-bolt w-4"></i>Redis<span class="nav-tag">高级</span></button>
+                <button class="nav-item" data-target="section-admin"><i class="fa fa-user w-4"></i>登录初始化<span class="nav-tag">交付</span></button>
+            </aside>
+
+            <div>
+                <section id="section-ragflow" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">知识库</h3>
+                            <p class="text-sm text-gray-500 mt-1">AI Server上传和知识库下拉列表使用这组配置。</p>
+                        </div>
+                        <span id="ragflowStatus" class="badge badge-muted">未加载</span>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="lg:col-span-2">
+                            <label class="field-label" for="ragflowBaseUrl">AI Server API地址</label>
+                            <input id="ragflowBaseUrl" class="field-input" type="text" placeholder="http://192.168.1.246:9380">
+                        </div>
+                        <div class="lg:col-span-2">
+                            <label class="field-label" for="ragflowApiKey">AI Server API Key</label>
+                            <div class="secret-row">
+                                <input id="ragflowApiKey" class="field-input" type="password" autocomplete="new-password">
+                                <button id="toggleRagflowKeyBtn" type="button" class="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-600 hover:bg-gray-50" title="显示或隐藏">
+                                    <i class="fa fa-eye"></i>
+                                </button>
+                            </div>
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
+                                <input id="clearApiKey" type="checkbox" class="rounded text-blue-600">
+                                清空当前API Key
+                            </label>
+                            <p id="apiKeyHint" class="field-hint">正在检查API Key状态...</p>
+                        </div>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">上传到知识库</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">关闭后任务仍爬取，但不入库。</span>
+                            </span>
+                            <input id="ragflowUploadEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">上传后自动解析</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">AI Server收到文档后自动切片。</span>
+                            </span>
+                            <input id="ragflowAutoParse" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">已存在文档覆盖重传</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">本地正文更新后，同名文档会先删除再上传。</span>
+                            </span>
+                            <input id="ragflowReuploadExisting" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <div>
+                            <label class="field-label" for="ragflowTimeout">接口超时（秒）</label>
+                            <input id="ragflowTimeout" class="field-input" type="number" min="5" max="600">
+                        </div>
+                        <div>
+                            <label class="field-label" for="ragflowRetries">失败重试（次）</label>
+                            <input id="ragflowRetries" class="field-input" type="number" min="0" max="5">
+                        </div>
+                    </div>
+                    <details class="mt-4">
+                        <summary class="cursor-pointer text-sm font-semibold text-gray-700">AI Server专用代理</summary>
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+                            <label class="toggle-row flex items-center justify-between gap-3 lg:col-span-3">
+                                <span class="text-sm font-semibold text-gray-800">AI Server请求走代理</span>
+                                <input id="ragflowProxyEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                            </label>
+                            <div>
+                                <label class="field-label" for="ragflowProxyHttp">HTTP代理</label>
+                                <input id="ragflowProxyHttp" class="field-input" type="text">
+                            </div>
+                            <div>
+                                <label class="field-label" for="ragflowProxyHttps">HTTPS代理</label>
+                                <input id="ragflowProxyHttps" class="field-input" type="text">
+                            </div>
+                            <div>
+                                <label class="field-label" for="ragflowProxySocks5">SOCKS5代理</label>
+                                <input id="ragflowProxySocks5" class="field-input" type="text">
+                            </div>
+                        </div>
+                    </details>
+                </section>
+
+                <section id="section-proxy" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">代理</h3>
+                            <p class="text-sm text-gray-500 mt-1">外部网站访问使用这组代理，AI Server默认不走这里。</p>
+                        </div>
+                        <span id="proxyStatus" class="badge badge-muted">未加载</span>
+                    </div>
+                    <label class="toggle-row flex items-center justify-between gap-3 mb-4">
+                        <span class="text-sm font-semibold text-gray-800">启用爬虫代理</span>
+                        <input id="proxyEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                    </label>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div>
+                            <label class="field-label" for="proxyHttp">HTTP代理</label>
+                            <input id="proxyHttp" class="field-input" type="text" placeholder="http://127.0.0.1:7890">
+                        </div>
+                        <div>
+                            <label class="field-label" for="proxyHttps">HTTPS代理</label>
+                            <input id="proxyHttps" class="field-input" type="text" placeholder="http://127.0.0.1:7890">
+                        </div>
+                        <div>
+                            <label class="field-label" for="proxySocks5">SOCKS5代理</label>
+                            <input id="proxySocks5" class="field-input" type="text" placeholder="socks5://127.0.0.1:7891">
+                        </div>
+                        <div>
+                            <label class="field-label" for="proxyPlaywright">Playwright代理</label>
+                            <input id="proxyPlaywright" class="field-input" type="text" placeholder="http://127.0.0.1:7890">
+                        </div>
+                    </div>
+                </section>
+
+                <section id="section-crawl" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">自动识别与防漏</h3>
+                            <p class="text-sm text-gray-500 mt-1">系统会自动识别栏目主区、文章链接、日期和分页；这里只调整默认强度。</p>
+                        </div>
+                        <span class="badge badge-ok">实时生效</span>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div class="lg:col-span-3 section-subtitle">基础抓取</div>
+                        <div class="lg:col-span-3">
+                            <label class="field-label" for="crawlUserAgent">浏览器标识</label>
+                            <input id="crawlUserAgent" class="field-input" type="text">
+                            <p class="field-hint">请求和补充发现会使用这个 User-Agent。</p>
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlTimeout">请求超时（秒）</label>
+                            <input id="crawlTimeout" class="field-input" type="number" min="5" max="600">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlWaitTime">普通等待（秒）</label>
+                            <input id="crawlWaitTime" class="field-input" type="number" min="0" max="120">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlRenderWaitMs">动态渲染等待（毫秒）</label>
+                            <input id="crawlRenderWaitMs" class="field-input" type="number" min="1000" max="60000">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlClickTimeoutMs">翻页点击超时（毫秒）</label>
+                            <input id="crawlClickTimeoutMs" class="field-input" type="number" min="250" max="5000">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlMaxPages">栏目最大翻页</label>
+                            <input id="crawlMaxPages" class="field-input" type="number" min="1" max="1000">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlMaxPagesWithLimit">有文章上限时翻页</label>
+                            <input id="crawlMaxPagesWithLimit" class="field-input" type="number" min="1" max="1000">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlMaxEmptyPages">连续空页停止</label>
+                            <input id="crawlMaxEmptyPages" class="field-input" type="number" min="1" max="50">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlDetailRetries">正文重试（次）</label>
+                            <input id="crawlDetailRetries" class="field-input" type="number" min="1" max="5">
+                        </div>
+
+                        <div class="lg:col-span-3 section-subtitle mt-2">防漏策略</div>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">按日期范围收全文章</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">开启后不让文章数量上限提前截断日期范围。</span>
+                            </span>
+                            <input id="crawlDateRangePriority" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">动态接口补链</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">捕获前端接口返回的文章链接。</span>
+                            </span>
+                            <input id="crawlNetworkJsonEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">多来源补链</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">从页面、Feed、Sitemap等入口补充候选文章。</span>
+                            </span>
+                            <input id="crawlSupplementalEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">预过滤链接日期</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">按日期范围抓取时建议开启，只跳过列表日期明确超出范围的候选。</span>
+                            </span>
+                            <input id="crawlCandidateDatePrefilter" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">新任务默认使用代理</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">需要先在代理分组配置地址。</span>
+                            </span>
+                            <input id="crawlUseProxyDefault" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+
+                        <div class="lg:col-span-3 section-subtitle mt-2">补充来源</div>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">静态HTML链接</span>
+                            <input id="crawlSupplementalHtmlEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">标签属性链接</span>
+                            <input id="crawlSupplementalAttributesEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">结构化数据</span>
+                            <input id="crawlSupplementalStructuredEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">脚本JSON</span>
+                            <input id="crawlSupplementalScriptsEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">静态翻页</span>
+                            <input id="crawlSupplementalStaticPaginationEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">RSS / Atom</span>
+                            <input id="crawlSupplementalFeedsEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">Sitemap</span>
+                            <input id="crawlSupplementalSitemapsEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+
+                        <div class="lg:col-span-3 section-subtitle mt-2">补充规模</div>
+                        <div>
+                            <label class="field-label" for="crawlSupplementalMaxPerSource">单来源最大链接</label>
+                            <input id="crawlSupplementalMaxPerSource" class="field-input" type="number" min="100" max="5000">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlSupplementalMaxSitemaps">最多Sitemap数</label>
+                            <input id="crawlSupplementalMaxSitemaps" class="field-input" type="number" min="1" max="200">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlSupplementalMaxStaticPages">静态翻页补充页数</label>
+                            <input id="crawlSupplementalMaxStaticPages" class="field-input" type="number" min="1" max="100">
+                        </div>
+                    </div>
+                </section>
+
+                <section id="section-scheduler" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">Scheduling Concurrency</h3>
+                            <p class="text-sm text-gray-500 mt-1">大规模任务调度主要看这里。</p>
+                        </div>
+                        <span class="badge badge-warn">部分需重启</span>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label class="field-label" for="schedulerMaxConcurrent">最大并发任务 <span class="badge badge-warn">需重启</span></label>
+                            <input id="schedulerMaxConcurrent" class="field-input" type="number" min="1" max="32">
+                        </div>
+                        <div>
+                            <label class="field-label" for="schedulerMaxPerDomain">单域名并发</label>
+                            <input id="schedulerMaxPerDomain" class="field-input" type="number" min="1" max="8">
+                        </div>
+                        <div>
+                            <label class="field-label" for="schedulerRetries">失败重试</label>
+                            <input id="schedulerRetries" class="field-input" type="number" min="0" max="5">
+                        </div>
+                        <div>
+                            <label class="field-label" for="schedulerRetryBackoff">重试间隔（秒）</label>
+                            <input id="schedulerRetryBackoff" class="field-input" type="number" min="0" max="600">
+                        </div>
+                        <div>
+                            <label class="field-label" for="schedulerDomainCooldown">域名冷却（秒）</label>
+                            <input id="schedulerDomainCooldown" class="field-input" type="number" min="0" max="300">
+                        </div>
+                        <div>
+                            <label class="field-label" for="schedulerTaskTimeout">任务超时（秒）</label>
+                            <input id="schedulerTaskTimeout" class="field-input" type="number" min="300" max="86400">
+                        </div>
+                        <div>
+                            <label class="field-label" for="schedulerCompletedRetention">完成记录保留（秒）</label>
+                            <input id="schedulerCompletedRetention" class="field-input" type="number" min="60" max="86400">
+                        </div>
+                    </div>
+                </section>
+
+                <section id="section-system" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">系统</h3>
+                            <p class="text-sm text-gray-500 mt-1">服务启动、日志和会话相关配置。</p>
+                        </div>
+                        <span class="badge badge-warn">端口需重启</span>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label class="field-label" for="flaskHost">监听地址 <span class="badge badge-warn">需重启</span></label>
+                            <input id="flaskHost" class="field-input" type="text">
+                        </div>
+                        <div>
+                            <label class="field-label" for="flaskPort">端口 <span class="badge badge-warn">需重启</span></label>
+                            <input id="flaskPort" class="field-input" type="number" min="1" max="65535">
+                        </div>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">调试模式</span>
+                            <input id="flaskDebug" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <div>
+                            <label class="field-label" for="sessionLifetime">登录有效期（秒）</label>
+                            <input id="sessionLifetime" class="field-input" type="number" min="300" max="2592000">
+                        </div>
+                        <div>
+                            <label class="field-label" for="authCheckInterval">认证检查间隔（秒）</label>
+                            <input id="authCheckInterval" class="field-input" type="number" min="60" max="86400">
+                        </div>
+                        <div>
+                            <label class="field-label" for="logLevel">日志级别</label>
+                            <select id="logLevel" class="field-input">
+                                <option value="DEBUG">DEBUG</option>
+                                <option value="INFO">INFO</option>
+                                <option value="WARNING">WARNING</option>
+                                <option value="ERROR">ERROR</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="field-label" for="logFile">日志文件</label>
+                            <input id="logFile" class="field-input" type="text">
+                        </div>
+                        <div class="lg:col-span-3">
+                            <label class="field-label" for="secretKey">SECRET_KEY <span id="secretKeyStatus" class="badge badge-muted">未加载</span></label>
+                            <div class="secret-row">
+                                <input id="secretKey" class="field-input" type="password" autocomplete="new-password">
+                                <button id="toggleSecretKeyBtn" type="button" class="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-600 hover:bg-gray-50" title="显示或隐藏">
+                                    <i class="fa fa-eye"></i>
+                                </button>
+                            </div>
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
+                                <input id="clearSecretKey" type="checkbox" class="rounded text-blue-600">
+                                清空SECRET_KEY
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="section-storage" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">存储</h3>
+                            <p class="text-sm text-gray-500 mt-1">本地数据库、爬取结果和登录态文件路径。</p>
+                        </div>
+                        <span class="badge badge-warn">需重启</span>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label class="field-label" for="databasePath">SQLite数据库</label>
+                            <input id="databasePath" class="field-input" type="text">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlResultsDir">爬取结果目录</label>
+                            <input id="crawlResultsDir" class="field-input" type="text">
+                        </div>
+                        <div>
+                            <label class="field-label" for="authStorageDir">登录态目录</label>
+                            <input id="authStorageDir" class="field-input" type="text">
+                        </div>
+                    </div>
+                </section>
+
+                <section id="section-redis" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">Redis</h3>
+                            <p class="text-sm text-gray-500 mt-1">任务状态缓存和运行队列使用。</p>
+                        </div>
+                        <span class="badge badge-warn">需重启</span>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label class="field-label" for="redisHost">主机</label>
+                            <input id="redisHost" class="field-input" type="text">
+                        </div>
+                        <div>
+                            <label class="field-label" for="redisPort">端口</label>
+                            <input id="redisPort" class="field-input" type="number" min="1" max="65535">
+                        </div>
+                        <div>
+                            <label class="field-label" for="redisDb">DB</label>
+                            <input id="redisDb" class="field-input" type="number" min="0" max="15">
+                        </div>
+                        <div class="lg:col-span-3">
+                            <label class="field-label" for="redisPassword">密码 <span id="redisPasswordStatus" class="badge badge-muted">未加载</span></label>
+                            <input id="redisPassword" class="field-input" type="password" autocomplete="new-password">
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
+                                <input id="clearRedisPassword" type="checkbox" class="rounded text-blue-600">
+                                清空Redis密码
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="section-admin" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">登录初始化</h3>
+                            <p class="text-sm text-gray-500 mt-1">只影响首次初始化管理员；已有账号请在用户管理里改。</p>
+                        </div>
+                        <span class="badge badge-muted">初始化配置</span>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div>
+                            <label class="field-label" for="adminUsername">默认管理员账号</label>
+                            <input id="adminUsername" class="field-input" type="text">
+                        </div>
+                        <div>
+                            <label class="field-label" for="adminEmail">邮箱</label>
+                            <input id="adminEmail" class="field-input" type="email">
+                        </div>
+                        <div>
+                            <label class="field-label" for="adminFullName">显示名</label>
+                            <input id="adminFullName" class="field-input" type="text">
+                        </div>
+                        <div>
+                            <label class="field-label" for="adminPassword">默认管理员密码 <span id="adminPasswordStatus" class="badge badge-muted">未加载</span></label>
+                            <input id="adminPassword" class="field-input" type="password" autocomplete="new-password">
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
+                                <input id="clearAdminPassword" type="checkbox" class="rounded text-blue-600">
+                                清空默认密码配置
+                            </label>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const $ = (id) => document.getElementById(id);
+        let keyState = {};
+
+        function setMessage(text, type = '') {
+            const box = $('messageBox');
+            if (!text) {
+                box.classList.add('hidden');
+                box.textContent = '';
+                return;
+            }
+            box.className = `status-box mb-5 ${type}`;
+            box.textContent = text;
+        }
+
+        function setBadge(id, text, type) {
+            const el = $(id);
+            if (!el) return;
+            const styles = {
+                ok: 'badge badge-ok',
+                warn: 'badge badge-warn',
+                idle: 'badge badge-muted',
+                muted: 'badge badge-muted'
+            };
+            el.className = styles[type] || styles.muted;
+            el.textContent = text;
+        }
+
+        function setButtonLoading(button, loading, text) {
+            if (!button) return;
+            if (!button.dataset.originalHtml) button.dataset.originalHtml = button.innerHTML;
+            button.disabled = loading;
+            button.innerHTML = loading ? `<i class="fa fa-spinner fa-spin mr-1.5"></i>${text}` : button.dataset.originalHtml;
+        }
+
+        function setVal(id, value) {
+            const el = $(id);
+            if (el) el.value = value ?? '';
+        }
+
+        function setChecked(id, value) {
+            const el = $(id);
+            if (el) el.checked = !!value;
+        }
+
+        function val(id) {
+            return ($(id)?.value || '').trim();
+        }
+
+        function checked(id) {
+            return !!$(id)?.checked;
+        }
+
+        function fillSecret(inputId, clearId, configured, labelId, name) {
+            keyState[inputId] = !!configured;
+            setVal(inputId, '');
+            $(inputId).placeholder = configured ? '已配置，留空表示不修改' : `请输入${name}`;
+            setChecked(clearId, false);
+            $(inputId).disabled = false;
+            setBadge(labelId, configured ? '已配置' : '未配置', configured ? 'ok' : 'warn');
+        }
+
+        function fillConfig(data) {
+            $('envPath').textContent = `配置文件：${data.env_path || '.env'}`;
+
+            const system = data.system || {};
+            setVal('flaskHost', system.flask_host);
+            setVal('flaskPort', system.flask_port);
+            setChecked('flaskDebug', system.flask_debug);
+            fillSecret('secretKey', 'clearSecretKey', system.secret_key_configured, 'secretKeyStatus', 'SECRET_KEY');
+            setVal('sessionLifetime', system.session_lifetime);
+            setVal('authCheckInterval', system.auth_check_interval);
+            setVal('logLevel', system.log_level || 'INFO');
+            setVal('logFile', system.log_file);
+
+            const admin = data.admin || {};
+            setVal('adminUsername', admin.username);
+            setVal('adminEmail', admin.email);
+            setVal('adminFullName', admin.full_name);
+            fillSecret('adminPassword', 'clearAdminPassword', admin.password_configured, 'adminPasswordStatus', '默认管理员密码');
+
+            const storage = data.storage || {};
+            setVal('databasePath', storage.database_path);
+            setVal('crawlResultsDir', storage.crawl_results_dir);
+            setVal('authStorageDir', storage.auth_storage_dir);
+
+            const redis = data.redis || {};
+            setVal('redisHost', redis.host);
+            setVal('redisPort', redis.port);
+            setVal('redisDb', redis.db);
+            fillSecret('redisPassword', 'clearRedisPassword', redis.password_configured, 'redisPasswordStatus', 'Redis密码');
+
+            const scheduler = data.scheduler || {};
+            setVal('schedulerMaxConcurrent', scheduler.max_concurrent);
+            setVal('schedulerMaxPerDomain', scheduler.max_per_domain);
+            setVal('schedulerRetries', scheduler.retries);
+            setVal('schedulerRetryBackoff', scheduler.retry_backoff);
+            setVal('schedulerDomainCooldown', scheduler.domain_cooldown);
+            setVal('schedulerTaskTimeout', scheduler.task_timeout);
+            setVal('schedulerCompletedRetention', scheduler.completed_retention);
+
+            const crawl = data.crawl || {};
+            setVal('crawlUserAgent', crawl.user_agent);
+            setVal('crawlTimeout', crawl.timeout);
+            setVal('crawlWaitTime', crawl.wait_time);
+            setVal('crawlRenderWaitMs', crawl.render_wait_ms);
+            setVal('crawlClickTimeoutMs', crawl.click_timeout_ms);
+            setVal('crawlMaxPages', crawl.max_pages);
+            setVal('crawlMaxPagesWithLimit', crawl.max_pages_with_limit);
+            setVal('crawlMaxEmptyPages', crawl.max_empty_pages);
+            setVal('crawlDetailRetries', crawl.detail_max_retries);
+            setChecked('crawlDateRangePriority', crawl.date_range_priority);
+            setChecked('crawlCandidateDatePrefilter', crawl.candidate_date_prefilter);
+            setChecked('crawlNetworkJsonEnabled', crawl.network_json_enabled);
+            setChecked('crawlSupplementalEnabled', crawl.supplemental_enabled);
+            setChecked('crawlSupplementalHtmlEnabled', crawl.supplemental_html);
+            setChecked('crawlSupplementalAttributesEnabled', crawl.supplemental_attributes);
+            setChecked('crawlSupplementalStructuredEnabled', crawl.supplemental_structured);
+            setChecked('crawlSupplementalScriptsEnabled', crawl.supplemental_scripts);
+            setChecked('crawlSupplementalStaticPaginationEnabled', crawl.supplemental_static_pagination);
+            setChecked('crawlSupplementalFeedsEnabled', crawl.supplemental_feeds);
+            setChecked('crawlSupplementalSitemapsEnabled', crawl.supplemental_sitemaps);
+            setVal('crawlSupplementalMaxPerSource', crawl.supplemental_max_per_source);
+            setVal('crawlSupplementalMaxSitemaps', crawl.supplemental_max_sitemaps);
+            setVal('crawlSupplementalMaxStaticPages', crawl.supplemental_max_static_pages);
+            setChecked('crawlUseProxyDefault', crawl.use_proxy_default);
+
+            const proxy = data.proxy || {};
+            setChecked('proxyEnabled', proxy.enabled);
+            setVal('proxyHttp', proxy.http);
+            setVal('proxyHttps', proxy.https);
+            setVal('proxySocks5', proxy.socks5);
+            setVal('proxyPlaywright', proxy.playwright);
+            setBadge('proxyStatus', proxy.enabled ? '已启用' : '已关闭', proxy.enabled ? 'ok' : 'idle');
+
+            const ragflow = data.ragflow || {};
+            setVal('ragflowBaseUrl', ragflow.base_url);
+            fillSecret('ragflowApiKey', 'clearApiKey', ragflow.api_key_configured, 'apiKeyHint', 'AI Server API Key');
+            $('apiKeyHint').textContent = ragflow.api_key_configured ? 'API Key已配置，留空保存会保留原值。' : 'API Key未配置，知识库下拉无法加载。';
+            $('apiKeyHint').className = 'field-hint';
+            setChecked('ragflowUploadEnabled', ragflow.upload_enabled);
+            setChecked('ragflowAutoParse', ragflow.auto_parse);
+            setChecked('ragflowReuploadExisting', ragflow.reupload_existing);
+            setVal('ragflowTimeout', ragflow.timeout);
+            setVal('ragflowRetries', ragflow.upload_retries);
+            setChecked('ragflowProxyEnabled', ragflow.proxy_enabled);
+            setVal('ragflowProxyHttp', ragflow.proxy_http);
+            setVal('ragflowProxyHttps', ragflow.proxy_https);
+            setVal('ragflowProxySocks5', ragflow.proxy_socks5);
+            setBadge(
+                'ragflowStatus',
+                ragflow.base_url && ragflow.api_key_configured ? '已配置' : '未配置完整',
+                ragflow.base_url && ragflow.api_key_configured ? 'ok' : 'warn'
+            );
+        }
+
+        function collectConfig() {
+            return {
+                system: {
+                    flask_host: val('flaskHost'),
+                    flask_port: val('flaskPort'),
+                    flask_debug: checked('flaskDebug'),
+                    secret_key: val('secretKey'),
+                    clear_secret_key: checked('clearSecretKey'),
+                    session_lifetime: val('sessionLifetime'),
+                    auth_check_interval: val('authCheckInterval'),
+                    log_level: val('logLevel'),
+                    log_file: val('logFile')
+                },
+                admin: {
+                    username: val('adminUsername'),
+                    password: val('adminPassword'),
+                    clear_password: checked('clearAdminPassword'),
+                    email: val('adminEmail'),
+                    full_name: val('adminFullName')
+                },
+                storage: {
+                    database_path: val('databasePath'),
+                    crawl_results_dir: val('crawlResultsDir'),
+                    auth_storage_dir: val('authStorageDir')
+                },
+                redis: {
+                    host: val('redisHost'),
+                    port: val('redisPort'),
+                    db: val('redisDb'),
+                    password: val('redisPassword'),
+                    clear_password: checked('clearRedisPassword')
+                },
+                scheduler: {
+                    max_concurrent: val('schedulerMaxConcurrent'),
+                    max_per_domain: val('schedulerMaxPerDomain'),
+                    retries: val('schedulerRetries'),
+                    retry_backoff: val('schedulerRetryBackoff'),
+                    domain_cooldown: val('schedulerDomainCooldown'),
+                    task_timeout: val('schedulerTaskTimeout'),
+                    completed_retention: val('schedulerCompletedRetention')
+                },
+                crawl: {
+                    user_agent: val('crawlUserAgent'),
+                    timeout: val('crawlTimeout'),
+                    wait_time: val('crawlWaitTime'),
+                    render_wait_ms: val('crawlRenderWaitMs'),
+                    click_timeout_ms: val('crawlClickTimeoutMs'),
+                    max_pages: val('crawlMaxPages'),
+                    max_pages_with_limit: val('crawlMaxPagesWithLimit'),
+                    max_empty_pages: val('crawlMaxEmptyPages'),
+                    detail_max_retries: val('crawlDetailRetries'),
+                    date_range_priority: checked('crawlDateRangePriority'),
+                    candidate_date_prefilter: checked('crawlCandidateDatePrefilter'),
+                    network_json_enabled: checked('crawlNetworkJsonEnabled'),
+                    supplemental_enabled: checked('crawlSupplementalEnabled'),
+                    supplemental_html: checked('crawlSupplementalHtmlEnabled'),
+                    supplemental_attributes: checked('crawlSupplementalAttributesEnabled'),
+                    supplemental_structured: checked('crawlSupplementalStructuredEnabled'),
+                    supplemental_scripts: checked('crawlSupplementalScriptsEnabled'),
+                    supplemental_static_pagination: checked('crawlSupplementalStaticPaginationEnabled'),
+                    supplemental_feeds: checked('crawlSupplementalFeedsEnabled'),
+                    supplemental_sitemaps: checked('crawlSupplementalSitemapsEnabled'),
+                    supplemental_max_per_source: val('crawlSupplementalMaxPerSource'),
+                    supplemental_max_sitemaps: val('crawlSupplementalMaxSitemaps'),
+                    supplemental_max_static_pages: val('crawlSupplementalMaxStaticPages'),
+                    use_proxy_default: checked('crawlUseProxyDefault')
+                },
+                proxy: {
+                    enabled: checked('proxyEnabled'),
+                    http: val('proxyHttp'),
+                    https: val('proxyHttps'),
+                    socks5: val('proxySocks5'),
+                    playwright: val('proxyPlaywright')
+                },
+                ragflow: {
+                    base_url: val('ragflowBaseUrl'),
+                    api_key: val('ragflowApiKey'),
+                    clear_api_key: checked('clearApiKey'),
+                    upload_enabled: checked('ragflowUploadEnabled'),
+                    auto_parse: checked('ragflowAutoParse'),
+                    reupload_existing: checked('ragflowReuploadExisting'),
+                    timeout: val('ragflowTimeout'),
+                    upload_retries: val('ragflowRetries'),
+                    proxy_enabled: checked('ragflowProxyEnabled'),
+                    proxy_http: val('ragflowProxyHttp'),
+                    proxy_https: val('ragflowProxyHttps'),
+                    proxy_socks5: val('ragflowProxySocks5')
+                }
+            };
+        }
+
+        function loadConfig() {
+            setMessage('');
+            return fetch('/api/config-management/config')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || '读取配置失败');
+                    fillConfig(data);
+                })
+                .catch(error => setMessage(error.message, 'error'));
+        }
+
+        function saveConfig() {
+            setMessage('');
+            const saveBtn = $('saveBtn');
+            setButtonLoading(saveBtn, true, '保存中');
+            fetch('/api/config-management/config', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(collectConfig())
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || '保存配置失败');
+                    fillConfig(data);
+                    const extra = data.restart_reasons && data.restart_reasons.length ? `：${data.restart_reasons.join('；')}` : '';
+                    setMessage((data.message || '配置已保存') + extra, data.restart_required ? 'warn' : 'ok');
+                })
+                .catch(error => setMessage(error.message, 'error'))
+                .finally(() => setButtonLoading(saveBtn, false));
+        }
+
+        function testRagflow() {
+            setMessage('');
+            const btn = $('testRagflowBtn');
+            setButtonLoading(btn, true, '测试中');
+            fetch('/api/schedule-management/ragflow/datasets')
+                .then(response => response.json().then(data => {
+                    if (!response.ok) throw new Error(data.error || data.message || `HTTP ${response.status}`);
+                    return data;
+                }))
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || data.message || '知识库测试失败');
+                    if (data.configured === false) {
+                        setMessage(data.message || 'AI Server未配置', 'warn');
+                        setBadge('ragflowStatus', '未配置完整', 'warn');
+                        return;
+                    }
+                    const count = Array.isArray(data.datasets) ? data.datasets.length : 0;
+                    const uploadText = data.upload_enabled === false ? '，但上传开关关闭' : '';
+                    setMessage(`AI Server连接正常，已加载 ${count} 个知识库${uploadText}`, data.upload_enabled === false ? 'warn' : 'ok');
+                    setBadge('ragflowStatus', '连接正常', data.upload_enabled === false ? 'warn' : 'ok');
+                })
+                .catch(error => {
+                    setMessage(error.message, 'error');
+                    setBadge('ragflowStatus', '连接失败', 'warn');
+                })
+                .finally(() => setButtonLoading(btn, false));
+        }
+
+        function bindSecretClear(inputId, clearId) {
+            $(clearId).addEventListener('change', function() {
+                $(inputId).disabled = this.checked;
+                if (this.checked) setVal(inputId, '');
+            });
+        }
+
+        function bindTogglePassword(buttonId, inputId) {
+            $(buttonId).addEventListener('click', function() {
+                const input = $(inputId);
+                input.type = input.type === 'password' ? 'text' : 'password';
+                this.innerHTML = input.type === 'password' ? '<i class="fa fa-eye"></i>' : '<i class="fa fa-eye-slash"></i>';
+            });
+        }
+
+        document.querySelectorAll('.nav-item').forEach(button => {
+            button.addEventListener('click', function() {
+                document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById(this.dataset.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        });
+
+        $('menuBtn').addEventListener('click', () => $('mobileMenu').classList.toggle('hidden'));
+        $('reloadBtn').addEventListener('click', loadConfig);
+        $('saveBtn').addEventListener('click', saveConfig);
+        $('testRagflowBtn').addEventListener('click', testRagflow);
+        bindTogglePassword('toggleRagflowKeyBtn', 'ragflowApiKey');
+        bindTogglePassword('toggleSecretKeyBtn', 'secretKey');
+        bindSecretClear('ragflowApiKey', 'clearApiKey');
+        bindSecretClear('secretKey', 'clearSecretKey');
+        bindSecretClear('redisPassword', 'clearRedisPassword');
+        bindSecretClear('adminPassword', 'clearAdminPassword');
+        loadConfig();
+    </script>
+</body>
+</html>
